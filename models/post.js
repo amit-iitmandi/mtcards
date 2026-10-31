@@ -2,22 +2,21 @@ const mongoose = require("mongoose");
 const { ObjectId } = mongoose.Schema.Types;
 
 const postSchema = new mongoose.Schema({
-
   image: {
     type: Array,
     required: true,
   },
-  title:{
+  title: {
     type: String,
-    required:true
+    required: true,
   },
-  type1:{
+  type1: {
     type: String,
-    required:true
+    required: true,
   },
-  type2:{
+  type2: {
     type: String,
-    required:true
+    required: true,
   },
   description: {
     type: String,
@@ -35,11 +34,10 @@ const postSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-
-  // postedBy:{
-  //    type:ObjectId,
-  //    ref:"User"
-  // }
+  postedBy: {
+    type: ObjectId,
+    ref: "User",
+  },
 });
 
 mongoose.model("Post", postSchema);
