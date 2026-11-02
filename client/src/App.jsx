@@ -26,7 +26,7 @@ function App() {
   const [search, setSearch] = useState('');
   return <Router><div className="storefront" lang="hi">
     <div className="announcement">शादी के कार्ड की बिक्री · प्रिंटिंग · थोक ऑर्डर <span>जखनियाँ, गाज़ीपुर</span></div>
-    <header className="shop-header"><Link className="shop-brand" to="/" aria-label="माँ तारा कार्ड पैलेस होम"><span className="brand-mark">माँ</span><span><strong>माँ तारा</strong><small>कार्ड पैलेस</small></span></Link>
+    <header className="shop-header"><Link className="shop-brand" to="/" aria-label="माँ तारा कार्ड पैलेस होम"><img className="shop-logo" src="/images/maa-tara-brand.svg" width="300" height="100" alt="माँ तारा कार्ड पैलेस" /></Link>
       <nav aria-label="मुख्य नेविगेशन"><a href="/#catalogue">कार्ड संग्रह</a><a href="/#services">हमारी सेवाएँ</a><a href="/#how-it-works">कैसे ऑर्डर करें</a></nav>
       <a className="header-action" href="/#catalogue">अपना कार्ड चुनें <span>↗</span></a>
     </header>
