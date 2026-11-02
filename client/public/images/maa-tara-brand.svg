@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100" role="img" aria-labelledby="title desc">
+<title id="title">माँ तारा कार्ड पैलेस</title><desc id="desc">सुनहरे मंदिर के मेहराब और विवाह निमंत्रण के साथ हिंदी ब्रांड चिह्न</desc>
+<defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#d8ab55"/><stop offset="1" stop-color="#976325"/></linearGradient></defs>
+<path d="M5 82V28Q17 27 22 18Q34 23 43 5Q52 22 64 18Q70 27 82 28V82Z" fill="#fff6e7" stroke="url(#g)" stroke-width="3"/>
+<path d="M19 76V36Q32 32 43 17Q53 33 67 36V76Z" fill="none" stroke="#d9ae62" stroke-width="1.5"/>
+<g fill="#872a35"><path d="M43 22c-4 7-11 13-11 21 0 7 5 12 11 13 6-1 11-6 11-13 0-8-7-14-11-21Zm0 8c2 5 5 9 5 14 0 4-2 7-5 8-3-1-5-4-5-8 0-5 3-9 5-14Z"/><circle cx="43" cy="19" r="3"/><path d="M26 63h34v15H26z" rx="2"/></g>
+<path d="M30 66h26m-26 5h26" stroke="#d8ab55" stroke-width="2"/>
+<text x="97" y="49" font-size="38" font-family="'Noto Serif Devanagari','Noto Sans Devanagari',serif" font-weight="700" fill="#7b2535">माँ तारा</text>
+<path d="M97 56h184" stroke="url(#g)" stroke-width="1.7"/>
+<text x="99" y="83" font-size="24" font-family="'Noto Sans Devanagari',sans-serif" font-weight="700" fill="#9a682b">कार्ड पैलेस</text>
+</svg>
