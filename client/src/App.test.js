@@ -31,3 +31,24 @@ test('inquiry encodes Hindi and product details and rejects unconfigured numbers
   expect(inquiryUrl(card, '')).toBeNull();
   expect(inquiryUrl(card, 'javascript:alert(1)')).toBeNull();
 });
+
+test('search filters existing catalogue titles without another request', async () => {
+  axios.get.mockResolvedValue({ data: [card, { ...card, title: '202' }] });
+  const { rerender } = render(<Home search="101" />);
+  expect(await screen.findByText('MT. 101')).toBeInTheDocument();
+  expect(screen.queryByText('MT. 202')).not.toBeInTheDocument();
+  rerender(<Home search="202" />);
+  expect(screen.getByText('MT. 202')).toBeInTheDocument();
+  expect(axios.get).toHaveBeenCalledTimes(1);
+});
+
+test('image gallery supports keyboard closing and restores focus', async () => {
+  render(<Post item={card} />);
+  const trigger = screen.getByRole('button', { name: /की तस्वीरें देखें/ });
+  trigger.focus();
+  fireEvent.click(trigger);
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+});
