@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 
-const axios = require("axios");
+import axios from "axios";
 
 const MyPost = (props) => {
   const [post, setPost] = useState([]);

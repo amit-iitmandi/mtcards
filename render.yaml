@@ -1,0 +1,26 @@
+# Use replaced credentials for the existing database; never seed production.
+services:
+  - type: web
+    name: mtcards-api
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm ci --omit=dev --ignore-scripts && npm run test:security
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_ACCESS
+        sync: false
+      - key: SECRET_OR_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://mtcards.in,https://www.mtcards.in,https://mtcards.vercel.app
+      - key: ALLOW_REGISTRATION
+        value: 'false'
