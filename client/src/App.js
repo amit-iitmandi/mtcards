@@ -15,9 +15,9 @@ import {
   Redirect,
 } from "react-router-dom";
 import CreatePost from "./component/CreatePost";
-import 'lazysizes';
+// Lazy image loading package is not installed; native image loading remains available.
 // import a plugin
-import 'lazysizes/plugins/parent-fit/ls.parent-fit';
+
 
 function setToken(userToken) {
   console.log(userToken);
