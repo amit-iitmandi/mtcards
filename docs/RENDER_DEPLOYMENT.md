@@ -1,23 +1,23 @@
 # MTcards backend on Render
 
-Status: preparation only; no service has been created and no production API URL is assigned.
+## Release contents
 
-## Release prerequisites
+The deployment branch includes the product authorization baseline, authentication privacy protections, removal of tracked runtime secrets, and tested backend startup changes. React remains on Vercel. MongoDB models and existing records are unchanged. Startup connects once before listening on Render's PORT, disables automatic index creation, and exits with a sanitized message on configuration/connection failures. /healthz returns 200 only while MongoDB is connected; API requests return 503 during database outages. Unknown API routes return JSON rather than React HTML.
 
-Integrate and test the Phase 0 fixes before creating this Blueprint: product authorization (#2), authentication privacy (#3), and removal of tracked runtime secrets (#5). Replace exposed provider credentials using the same existing MongoDB cluster and database; do not create an empty replacement database. Complete authentication validation/error handling. Fix the duplicate mongoose.connect calls in server.js so startup connects once, reports readiness only after MongoDB connects, and exits on failure. Add a database-aware health endpoint and restrict browser CORS to the verified frontend origins. Test these runtime changes in an isolated environment before production deployment.
+Public signup is disabled by default. Existing users can log in; login tokens expire after eight hours. Profile access is limited to the signed-in account. Product writes require a configured ADMIN_EMAILS allowlist; leave this unset until administrator identities are verified. Mass deletion remains disabled.
 
-Blueprint creation starts an initial deploy even with automatic deploys off. Do not create the service until these prerequisites pass. Do not deploy this preparation branch directly.
+## Private configuration required
 
-## Service configuration
+Set DATABASE_ACCESS in the Render Environment tab to a replacement connection string for the SAME existing MongoDB cluster and database. Do not use the credentials exposed in Git history. Replace the exposed database user's password with the provider, retaining existing collections and data. MongoDB network access must allow the Render service outbound addresses while preserving existing required access. Never seed, reset, import or migrate this database for this deployment.
 
-Use the repository root and render.yaml after merging the tested release into the default branch. This creates only a Node web service, with no database, disk, migrations or seed hooks. The backend installs root dependencies and runs security tests; React remains on Vercel. Start with node server.js, bypassing the existing npm start command that launches both frontend and backend development servers. Render supplies PORT. Automatic deployments stay off so backend releases remain deliberate.
+SECRET_OR_KEY is a new randomly generated signing secret in Render; old sessions will require login again. CORS_ORIGINS contains explicit frontend HTTPS origins. Add verified frontend domains as necessary; do not use wildcard origins. ALLOW_REGISTRATION=false keeps signup closed. ADMIN_EMAILS is intentionally unset by default so product mutations fail closed.
 
-Set DATABASE_ACCESS privately in Render to the existing database URI with replaced credentials. Set SECRET_OR_KEY to a strong replacement signing secret (existing sessions will require login again). Set ADMIN_EMAILS to the authorized shop administrator emails. Never copy values from the committed .env file. Allow the Render service outbound addresses in the existing MongoDB provider network rules without removing current access.
+The service uses the repository root, npm ci --omit=dev --ignore-scripts followed by npm run test:security, and node server.js. No frontend build, database creation, disk or migration hook is configured. Automatic deployments are off. Creation triggers an initial deployment, which cannot become ready until the private database configuration is supplied. Set /healthz as the Render HTTP health check if creating through the dashboard; render.yaml includes this path.
 
-## Connect the frontend
+## Connect Vercel after backend verification
 
-After the backend passes verification, integrate the catalogue reliability change (#4). Set Vercel REACT_APP_API_BASE_URL to the actual Render HTTPS service URL (no trailing slash), then rebuild the frontend. Check remaining fetch/axios calls, including authentication and administration, for relative API URLs; update those to use the same backend configuration before claiming the full application is connected. Never set an API URL to an assumed or unverified hostname.
+Set REACT_APP_API_BASE_URL to the actual Render HTTPS service URL (no trailing slash) and rebuild the frontend branch containing the catalogue reliability changes. Do not publish this setting before /healthz returns 200 and /allPost returns the existing catalogue as JSON. Audit remaining fetch/axios calls for relative API URLs, including upload and login, before declaring the full application connected.
 
-## Verify and rollback
+## Verification and rollback
 
-Run security tests and frontend production build for the exact release. Verify database-aware readiness, GET /allPost JSON and existing catalogue records/images. Verify GET /register does not list users, anonymous mutations fail, and authorized administration works using isolated test records. Check frontend catalogue, login and inquiries against the actual service. Do not run bulk deletion, seed, import or reset commands. Save the previous Vercel API URL and deployment so frontend configuration can be rolled back independently; use Render's previous tested deployment for backend rollback. No production write tests without explicitly isolated records.
+Run npm run test:security for the exact backend release. Tests use isolated dependencies and fixture data; they do not contact production MongoDB. Verify production readiness, catalogue JSON and existing images with read-only requests. Verify the public user directory stays unavailable, anonymous product mutation fails, and bulk deletion is disabled. Verify authorized administration using explicitly isolated test records only. Save the previous Vercel configuration/deployment for frontend rollback; use Render's previous tested deployment for backend rollback. Do not claim production database or frontend integration verification until those boundaries have passed.

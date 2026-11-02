@@ -1,4 +1,4 @@
-# Deployment preparation only. Complete docs/RENDER_DEPLOYMENT.md before creating.
+# Use replaced credentials for the existing database; never seed production.
 services:
   - type: web
     name: mtcards-api
@@ -7,6 +7,7 @@ services:
     plan: free
     buildCommand: npm ci --omit=dev --ignore-scripts && npm run test:security
     startCommand: node server.js
+    healthCheckPath: /healthz
     autoDeployTrigger: 'off'
     envVars:
       - key: NODE_VERSION
@@ -19,3 +20,7 @@ services:
         sync: false
       - key: ADMIN_EMAILS
         sync: false
+      - key: CORS_ORIGINS
+        value: https://mtcards.in,https://www.mtcards.in,https://mtcards.vercel.app
+      - key: ALLOW_REGISTRATION
+        value: 'false'
