@@ -1,7 +1,6 @@
 name: Phase 0 checks
 on:
   pull_request:
-    branches: [master]
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,5 +29,7 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm ci
         working-directory: client
-      - run: CI=false npm run build
+      - run: CI=true npm test -- --watchAll=false --runInBand
+        working-directory: client
+      - run: CI=false NODE_OPTIONS=--openssl-legacy-provider npm run build
         working-directory: client
