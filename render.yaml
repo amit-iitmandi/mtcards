@@ -1,0 +1,21 @@
+# Deployment preparation only. Complete docs/RENDER_DEPLOYMENT.md before creating.
+services:
+  - type: web
+    name: mtcards-api
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm ci --omit=dev --ignore-scripts && npm run test:security
+    startCommand: node server.js
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_ACCESS
+        sync: false
+      - key: SECRET_OR_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
