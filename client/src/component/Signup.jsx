@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-const axios = require("axios");
+import axios from "axios";
 
 function signing(credential) {
-  console.log(credential);
-  axios.post("/register", credential);
+  return axios.post("/register", credential);
 }
 
 function Signup() {
@@ -13,7 +12,8 @@ function Signup() {
   const [userConPass, setUserConPass] = useState("");
   const [userEmail, setUserEmail] = useState("");
 
-  const onSubmit = async () => {
+  const onSubmit = async (e) => {
+    e.preventDefault();
     await signing({
       userName,
       userPass,

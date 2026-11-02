@@ -16,7 +16,7 @@ The service uses the repository root, npm ci --omit=dev --ignore-scripts followe
 
 ## Connect Vercel after backend verification
 
-Set REACT_APP_API_BASE_URL to the actual Render HTTPS service URL (no trailing slash) and rebuild the frontend branch containing the catalogue reliability changes. Do not publish this setting before /healthz returns 200 and /allPost returns the existing catalogue as JSON. Audit remaining fetch/axios calls for relative API URLs, including upload and login, before declaring the full application connected.
+Set VITE_API_BASE_URL to the actual Render HTTPS service URL (no trailing slash) and rebuild the frontend branch containing the catalogue reliability changes. Do not publish this setting before /healthz returns 200 and /allPost returns the existing catalogue as JSON. Audit remaining fetch/axios calls for relative API URLs, including upload and login, before declaring the full application connected.
 
 ## Verification and rollback
 

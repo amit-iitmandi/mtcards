@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { createApp } = require('../server');
-const secret = 'isolated-integration-test-secret-never-used-in-production';
+const secret = require('node:crypto').randomBytes(32).toString('hex');
 const adminId = '507f1f77bcf86cd799439011';
 const memberId = '507f1f77bcf86cd799439012';
 const productId = '507f1f77bcf86cd799439013';
@@ -105,7 +105,7 @@ test('query injection and overlong UTF-8 passwords are rejected before persisten
 });
 
 test('expired, forged and unsupported-algorithm tokens cannot authorize mutations', async () => {
-  for (const token of [tokenFor(adminId, { expiresIn: -1 }), tokenFor(adminId, {}, 'wrong-secret'), tokenFor(adminId, { algorithm: 'HS384' }), 'Bearer broken']) {
+  for (const token of [tokenFor(adminId, { expiresIn: -1 }), tokenFor(adminId, {}, require('node:crypto').randomBytes(32).toString('hex')), tokenFor(adminId, { algorithm: 'HS384' }), 'Bearer broken']) {
     assert.equal((await request('/createPost', { method: 'POST', body: valid, token })).status, 401);
   }
   assert.equal(reads, 0); assert.equal(writes, 0);

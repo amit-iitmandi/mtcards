@@ -8,6 +8,14 @@ if (process.env.NODE_ENV !== "production") require("dotenv").config();
 function createApp({ database = mongoose, env = process.env, mountRoutes = true } = {}) {
   const app = express();
   app.disable("x-powered-by");
+  app.use((req, res, next) => {
+    res.set({ "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY",
+      "Referrer-Policy": "no-referrer", "Cache-Control": "no-store",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'" });
+    next();
+  });
+  const authLimit = require("./middleware/authLimit")();
+  app.use(["/login", "/register"], authLimit);
   const origins = (env.CORS_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean);
   app.use(cors({ origin: (origin, callback) => callback(null, !origin || origins.includes(origin)) }));
   app.use(express.urlencoded({ extended: false, limit: "100kb" }));
@@ -45,8 +53,6 @@ async function startServer({ database = mongoose, env = process.env, appFactory 
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Invalid PORT");
   database.set("bufferCommands", false);
   await database.connect(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 10000,
     autoIndex: false
   });

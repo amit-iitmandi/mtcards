@@ -16,6 +16,9 @@ test('health reflects DB disconnects and API requests fail promptly', async t =>
   let result = await fetch(url + '/healthz');
   assert.equal(result.status, 200);
   assert.equal(result.headers.get('cache-control'), 'no-store');
+  assert.equal(result.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(result.headers.get('x-frame-options'), 'DENY');
+  assert.equal(result.headers.get('x-powered-by'), null);
   database.connection.readyState = 0;
   result = await fetch(url + '/healthz');
   assert.equal(result.status, 503);
