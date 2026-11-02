@@ -15,17 +15,11 @@ const categories = [
 const formats = ['Single Card', 'Double Fold Card', 'Triple fold Card', 'Box Card', 'Farmaan Card'].map((name, id) => ({ name, id }));
 
 function InvitationArt() {
-  return <div className="invitation-scene" role="img" aria-label="मरून और सुनहरे रंग के विवाह निमंत्रण की कलात्मक झलक">
-    <div className="scene-halo" />
-    <div className="paper-envelope"><span className="envelope-seal">श्री</span></div>
-    <div className="invitation-paper"><div className="paper-border">
-      <span className="paper-flower">❋</span><span className="paper-blessing">॥ श्री गणेशाय नमः ॥</span>
-      <div className="paper-arch"><span>शुभ</span><strong>विवाह</strong><span className="paper-ornament">✦ ── ❋ ── ✦</span><p>दो दिलों का मिलन,<br />एक नये सफ़र का आरम्भ।</p></div>
-      <span className="paper-bottom">स्नेहिल आमंत्रण</span>
-    </div></div>
-    <div className="art-note"><span>हिन्दुस्तानी परम्परा</span><small>एक खूबसूरत शुरुआत</small></div>
-    <span className="scene-caption">निमंत्रण की कलात्मक झलक</span>
-  </div>;
+  return <figure className="wedding-visual">
+    <img src="/images/wedding-stationery-1536.webp" srcSet="/images/wedding-stationery-800.webp 800w, /images/wedding-stationery-1536.webp 1536w" sizes="(max-width: 680px) 100vw, 60vw" width="1536" height="1024" alt="गुलाब, गेंदे के फूल और विवाह मंडप के साथ सुनहरी नक्काशी वाला निमंत्रण" fetchPriority="high" />
+    <div className="photo-lettering" aria-hidden="true"><span>सप्रेम</span><strong>आमंत्रण</strong></div>
+    <figcaption>कल्पना से सजा निमंत्रण · AI से रचित दृश्य</figcaption>
+  </figure>;
 }
 function App() {
   const [filter, setFilter] = useState('');
@@ -37,11 +31,11 @@ function App() {
       <a className="header-action" href="/#catalogue">अपना कार्ड चुनें <span>↗</span></a>
     </header>
     <Switch><Route exact path="/">
-      <main><section className="shop-hero"><div className="hero-copy"><p className="eyebrow"><span /> रिश्तों की शुरुआत, एक निमंत्रण से</p>
-        <h1>आपकी खुशियों का<br /><em>पहला निमंत्रण।</em></h1>
-        <p className="hero-description">परम्परा की खूबसूरती, आपके अपने अंदाज़ में।<br />अपनी शादी के लिए चुनें मनपसंद कार्ड और पाएँ<br className="desktop-break" /> डिज़ाइन से प्रिंटिंग तक हमारी मदद।</p>
+      <main><section className="shop-hero"><div className="hero-copy"><p className="eyebrow"><span /> MAA TARA CARD PALACE · जखनियाँ</p>
+        <h1>शादी की पहली<br /><em>खूबसूरत झलक।</em></h1>
+        <p className="hero-description">कुछ खुशियाँ बताई नहीं जातीं, प्यार से भेजी जाती हैं।<br />अपनी कहानी को दीजिए एक खूबसूरत निमंत्रण —<br className="desktop-break" /> आपकी पसंद का कार्ड, आपके अपनों के नाम।</p>
         <div className="hero-actions"><a className="primary-action" href="#catalogue">कार्ड संग्रह देखें <span>↗</span></a><a className="text-action" href="#how-it-works">ऑर्डर कैसे करें <span>→</span></a></div>
-        <div className="hero-footnote"><span className="fine-flower">❋</span><p>खाली कार्ड से छपे निमंत्रण तक<small>खुदरा और थोक, दोनों के लिए</small></p></div>
+        <div className="hero-footnote"><span className="fine-flower" aria-hidden="true">✺</span><p>खाली कार्ड से छपे निमंत्रण तक<small>खुदरा और थोक, दोनों के लिए</small></p></div>
       </div><InvitationArt /></section>
       <div className="service-ribbon" aria-label="उपलब्ध सेवाएँ"><span>शादी के कार्ड</span><i>✦</i><span>हिन्दी प्रिंटिंग</span><i>✦</i><span>खाली कार्ड</span><i>✦</i><span>थोक ऑर्डर</span><i>✦</i><span>आपकी पसंद का डिज़ाइन</span></div>
       <section className="catalogue-section" id="catalogue"><div className="section-heading"><div><p className="eyebrow">आपके शुभ अवसर के लिए</p><h2>हर निमंत्रण, <em>कुछ ख़ास।</em></h2></div><p>अपना पसंदीदा कार्ड चुनें।<br />उपलब्धता और प्रिंटिंग के लिए पूछें।</p></div>
@@ -49,6 +43,7 @@ function App() {
           <label className="catalogue-search"><span aria-hidden="true">⌕</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="कार्ड का नाम या कोड खोजें" aria-label="कार्ड खोजें" /></label></div>
         <Home filter={filter} search={search} />
       </section>
+      <section className="wedding-story" aria-labelledby="story-title"><figure><img src="/images/wedding-story-800.webp" srcSet="/images/wedding-story-800.webp 800w, /images/wedding-story-1536.webp 1536w" sizes="(max-width: 680px) 100vw, 50vw" width="1536" height="1024" loading="lazy" alt="मेहंदी और चूड़ियों से सजे हाथों में सुनहरा विवाह निमंत्रण" /><figcaption>AI से रचित प्रेरणात्मक दृश्य</figcaption></figure><div className="story-copy"><p className="eyebrow">कागज़ पर प्यार, अपनों तक पैग़ाम</p><h2 id="story-title">बस एक कार्ड नहीं,<br /><em>खुशियों का पैग़ाम।</em></h2><p>पहला नाम लिखने से लेकर आख़िरी न्योता देने तक, हर छोटे लम्हे में आपकी कहानी है। उसे सजाएँ अपने रंगों, अपनी भाषा और अपने अंदाज़ में।</p><a className="text-action" href="#services">मिलकर बनाएँ आपका निमंत्रण <span>↗</span></a><span className="story-signature" aria-hidden="true">शुभारम्भ</span></div></section>
       <section className="services-section" id="services"><div className="service-intro"><p className="eyebrow">एक ही जगह, हर ज़रूरत</p><h2>आपका अंदाज़।<br /><em>हमारी कारीगरी।</em></h2></div><div className="service-description"><article><span>01</span><div><h3>मनपसंद खाली कार्ड</h3><p>अपनी पसंद के कार्ड चुनें और प्रिंटिंग अपनी सुविधा से करवाएँ।</p></div></article><article><span>02</span><div><h3>कार्ड और हिन्दी प्रिंटिंग</h3><p>परिवार के नाम, कार्यक्रम और पते के साथ आपका अपना निमंत्रण।</p></div></article><article><span>03</span><div><h3>खुदरा और थोक बिक्री</h3><p>मात्रा और कार्ड के अनुसार कीमत व उपलब्धता की जानकारी लें।</p></div></article></div></section>
       <section className="order-section" id="how-it-works"><p className="eyebrow">बस तीन आसान कदम</p><h2>चुनने से छपने तक, <em>हम आपके साथ।</em></h2><div className="order-steps"><article><span>01 / पसंद</span><h3>अपना कार्ड चुनें</h3><p>संग्रह देखें और मनपसंद कार्ड का कोड नोट करें।</p></article><article><span>02 / बातचीत</span><h3>ज़रूरत हमें बताएँ</h3><p>कार्ड की मात्रा, प्रिंटिंग और तारीख के बारे में बात करें।</p></article><article><span>03 / तैयारी</span><h3>विवरण पक्का करें</h3><p>कीमत, डिज़ाइन और तैयार होने का समय तय करके ऑर्डर दें।</p></article></div></section>
       </main>
