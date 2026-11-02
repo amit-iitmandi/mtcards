@@ -1,0 +1,9 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const validatePost = require("../utils/validatePost");
+const valid = { title:"101", type1:"Wedding", type2:"Fold", cPrice:"10", sPrice:"8", stock:100, image:["https://example.com/card.jpg"] };
+test("accepts existing product shape", () => assert.equal(validatePost(valid).stock, 100));
+test("rejects invalid stock", () => assert.equal(validatePost({...valid,stock:-1}), null));
+test("rejects script URL", () => assert.equal(validatePost({...valid,image:["javascript:alert(1)"]}), null));
+test("rejects oversized title", () => assert.equal(validatePost({...valid,title:"x".repeat(121)}), null));
+test("rejects empty images", () => assert.equal(validatePost({...valid,image:[]}), null));

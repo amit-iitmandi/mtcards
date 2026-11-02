@@ -1,28 +1,25 @@
 const jwt = require("jsonwebtoken");
-const { JWT_SECRET } = require("../config/keys");
 const mongoose = require("mongoose");
 const User = mongoose.model("User");
 
-module.exports = (req, res, next) => {
-  const { authorization } = req.headers;
-  // console.log(authorization);
-  if (!authorization) {
-    console.log("you must be logged in");
-    return res.status(401).json({ error: "you must be logged in" });
+module.exports = async (req, res, next) => {
+  const authorization = req.headers.authorization || "";
+  if (!authorization.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Authentication required" });
   }
-  const token = authorization.replace("Bearer ", "");
-  // console.log(token);
-  jwt.verify(token, process.env.SECRET_OR_KEY, (err, payload) => {
-    if (err) {
-      console.log("you must be logged in");
-      return res.status(401).json({ error: "you must be logged in" });
+  if (!process.env.SECRET_OR_KEY) {
+    return res.status(503).json({ error: "Authentication unavailable" });
+  }
+  try {
+    const payload = jwt.verify(authorization.slice(7), process.env.SECRET_OR_KEY, { algorithms: ["HS256"] });
+    if (!payload || !payload.id || !mongoose.Types.ObjectId.isValid(payload.id)) {
+      return res.status(401).json({ error: "Invalid token" });
     }
-    const { id } = payload;
-    // console.log(payload);
-    User.findById(id).then((userdata) => {
-      // console.log(userdata);
-      req.user = userdata;
-      next();
-    });
-  });
+    const user = await User.findById(payload.id);
+    if (!user) return res.status(401).json({ error: "Invalid token" });
+    req.user = user;
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
 };

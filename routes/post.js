@@ -2,51 +2,52 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const requireLogin = require("../middleware/requireLogin");
+const requireAdmin = require("../middleware/requireAdmin");
+const validatePost = require("../utils/validatePost");
 const Post = mongoose.model("Post");
 
-router.post("/createPost", (req, res) => {
-  console.log(req.body);
-  const {stock,image,title,description,cPrice,sPrice,type1,type2} = req.body
-  const post = new Post({
-    title,
-    stock,
-    description,
-    cPrice,
-    sPrice,
-    image,
-    type1,
-    type2
-    // postedBy: req.user,
-  });
-  post.save().then((result) => {
-    res.json({ post: result });
-  })
-  .catch(err => console.log(err))
-});
-var mysort = { title: 1 };
-router.get("/allPost", (req, res) => {
-  Post.find().sort(mysort).then((posts) => {
-    res.json(posts);
-  });
+router.post("/createPost", requireAdmin, async (req, res) => {
+  const fields = validatePost(req.body);
+  if (!fields) return res.status(400).json({ error: "Invalid product data" });
+  try {
+    const post = await new Post(fields).save();
+    return res.status(201).json({ post });
+  } catch (err) {
+    return res.status(500).json({ error: "Could not save product" });
+  }
 });
 
-router.get("/myPost", requireLogin, (req, res) => {
-  console.log(req);
-  Post.find({postedBy:req.user._id}).then((posts) => {
-    res.json(posts);
-    // console.log(posts);
-    // return posts;
-  });
+router.get("/allPost", async (req, res) => {
+  try {
+    const posts = await Post.find().sort({ title: 1 });
+    return res.json(posts);
+  } catch (err) {
+    return res.status(500).json({ error: "Could not load products" });
+  }
 });
-router.delete("/allPost", (req,res)=>{
-  Post.deleteMany().then(()=>console.log("deleted"))
-})
 
-router.delete("/deletePost/:postId",(req,res)=>{
-  console.log("here");
-  Post.findOne({_id:req.params.postId})
-  .exec((err,post)=>{
-    post.remove();
-  })
-})
+router.get("/myPost", requireLogin, async (req, res) => {
+  try {
+    const posts = await Post.find({ postedBy: req.user._id });
+    return res.json(posts);
+  } catch (err) {
+    return res.status(500).json({ error: "Could not load products" });
+  }
+});
+
+// Deliberately disable the dangerous mass-delete endpoint.
+router.delete("/allPost", (req, res) => res.status(405).json({ error: "Mass deletion disabled" }));
+
+router.delete("/deletePost/:postId", requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.postId)) {
+    return res.status(400).json({ error: "Invalid product ID" });
+  }
+  try {
+    const post = await Post.findByIdAndDelete(req.params.postId);
+    if (!post) return res.status(404).json({ error: "Product not found" });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: "Could not delete product" });
+  }
+});
 module.exports = router;
