@@ -3,11 +3,10 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
-const Post = mongoose.model("Post");
 const User = mongoose.model("User");
 
 router.get("/register", (req, res) => {
-  User.find().then((usr) => res.json(usr));
+  return res.status(410).json({ error: "User directory is unavailable" });
 });
 
 router.post("/register", (req, res) => {
@@ -21,7 +20,7 @@ router.post("/register", (req, res) => {
         email: req.body.userEmail,
         password: req.body.userPass,
       });
-      console.log(newUser);
+
       bcrypt.genSalt(10, (err, salt) => {
         bcrypt.hash(newUser.password, salt, (err, hash) => {
           if (err) throw err;
@@ -34,6 +33,9 @@ router.post("/register", (req, res) => {
 });
 
 router.post("/login", (req, res) => {
+  if (!process.env.SECRET_OR_KEY) {
+    return res.status(503).json({ error: "Authentication unavailable" });
+  }
   const email = req.body.email;
   const password = req.body.userPass;
   // console.log(req);
@@ -65,11 +67,12 @@ router.post("/login", (req, res) => {
               expiresIn: 31556926, // 1 year in seconds
             },
             (err, token) => {
+              if (err) return res.status(503).json({ error: "Authentication unavailable" });
               res.json({
                 success: true,
                 token: "Bearer " + token,
               });
-              console.log(token);
+
               // path = token;
             }
           );
