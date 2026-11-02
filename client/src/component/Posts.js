@@ -1,5 +1,5 @@
 import Post from './Post';
-import { useState,useEffect } from "react";
+import { useState } from "react";
 const Posts = ({finalPost}) => {
 
   const [limit, setLimit] = useState(12)
@@ -24,9 +24,9 @@ const Posts = ({finalPost}) => {
               ))}
             </ul>
           )}
-          {finalPost?.length ==0 && <h1 className='empty-post'>Please Select Other Options</h1>}
+          {finalPost?.length === 0 && <h1 className='empty-post'>इस श्रेणी में अभी कार्ड उपलब्ध नहीं हैं।</h1>}
       </div>
-        {limit < finalPost.length &&<button className="w-100 btn btn-primary" onClick ={() =>setLimit(limit+12)}>Load More</button>}
+        {limit < finalPost.length &&<button className="w-100 btn btn-primary" onClick ={() =>setLimit(limit+12)}>और कार्ड देखें</button>}
     </>
   );
 };
