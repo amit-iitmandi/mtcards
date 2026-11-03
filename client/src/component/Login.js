@@ -1,81 +1,44 @@
-import { useState } from "react";
-import { Link, useHistory } from "react-router-dom";
-// import Firebase from "firebase";
-// import firebaseconfig from "../firebaseconfig";
-// const admin = require("firebase-admin ");
+import { useState, useEffect, useRef } from 'react';
+import { Link, useHistory, useLocation } from 'react-router-dom';
+import axios from 'axios';
+import { apiUrl } from '../utils/api';
+import './admin.css';
 
-// const app = Firebase.initializeApp(firebaseconfig);
-// // const auth = admin.auth();
-// const db = Firebase.firestore();
-
-// console.log(db);
-
-const axios = require("axios");
-
-// console.log(app.collections());
-// let ref = Firebase.database();
-//
-// ref
-//   .collection("posts")
-//   .get()
-//   .then((result) => console.log(result));
-// console.log(ref);
-// ref.on("value", (snapshot) => {
-//   console.log("ENter");
-//   console.log(snapshot);
-// });
-
-async function loginUser(credential) {
-  // console.log(credential);
-  return axios.post("/login", credential);
-  // .then(res =>  res.data)
-  // .catch(err =>  err)
-}
-function Login({ setToken }) {
+export default function Login() {
   const history = useHistory();
-  const [email, setEmail] = useState("");
-  const [userPass, setUserPass] = useState("");
-
-  const onSubmit = async (e) => {
-    const token = await loginUser({
-      email,
-      userPass,
-    });
-    // console.log(token);
-    history.push("/");
-    setToken(token);
-  };
-  return (
-    <div className="App">
-      <div className="Login-container">
-        <div className="Input">
-          <h1>Login Portal</h1>
-          <form onSubmit={onSubmit}>
-            <input
-              placeholder="Email"
-              type="text"
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              placeholder="Password"
-              type="Password"
-              onChange={(e) => setUserPass(e.target.value)}
-            />
-            <input
-              className="sbt-btn"
-              type="button"
-              value="Login"
-              onClick={onSubmit}
-            />
-          </form>
-          <div className="line"></div>
-          <Link className="btn-sgn" to="/signup">
-            Signup
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const location = useLocation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function submit(event) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setError('');
+    try {
+      const { data } = await axios.post(apiUrl('/login'), { email: email.trim().toLowerCase(), userPass: password }, { timeout: 15000 });
+      if (!data || typeof data.token !== 'string' || !data.token.startsWith('Bearer ')) throw new Error('Invalid session');
+      await axios.get(apiUrl('/admin/session'), { headers: { Authorization: data.token }, timeout: 15000 });
+      if (!active.current) return;
+      sessionStorage.setItem('token', JSON.stringify({ data: { token: data.token } }));
+      setPassword(''); history.replace('/upload');
+    } catch (err) {
+      if (!active.current) return;
+      sessionStorage.removeItem('token');
+      setError(err.response?.status === 403 ? 'इस खाते को व्यवस्थापक की अनुमति नहीं है।' : err.response?.status === 401 ? 'ईमेल या पासवर्ड सही नहीं है।' : 'लॉगिन अभी उपलब्ध नहीं है। कृपया फिर कोशिश करें।');
+    } finally { if (active.current) setBusy(false); }
+  }
+  return <main className="admin-page"><section className="admin-panel">
+    <p className="eyebrow">माँ तारा कार्ड पैलेस</p><h1>व्यवस्थापक लॉगिन</h1>
+    <p>कार्ड के विवरण और तस्वीरें जोड़ने के लिए प्रवेश करें।</p>
+    {location.state?.passwordCreated && <p role="status">पासवर्ड तैयार है। अब अपने खाते से लॉगिन करें।</p>}
+    <form onSubmit={submit}>
+      <label htmlFor="admin-email">ईमेल</label><input id="admin-email" type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} />
+      <label htmlFor="admin-password">पासवर्ड</label><input id="admin-password" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} />
+      {error && <p role="alert">{error}</p>}
+      <button className="primary-action" type="submit" disabled={busy}>{busy ? 'प्रवेश हो रहा है…' : 'लॉगिन करें'}</button>
+    </form><Link to="/admin/setup">पहली बार? पासवर्ड बनाएँ</Link>
+  </section></main>;
 }
-
-export default Login;
