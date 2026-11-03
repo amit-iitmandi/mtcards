@@ -1,4 +1,5 @@
 import './createPost.css';
+import { apiUrl } from '../utils/api';
 import { useState,useEffect } from "react";
 import Compress from 'react-image-file-resizer'
 import Loading from './Loading';
@@ -7,8 +8,22 @@ const axios = require("axios");
 
 
 
+function storedToken() {
+  try {
+    const token = JSON.parse(sessionStorage.getItem("token"))?.data?.token;
+    return typeof token === "string" && token.startsWith("Bearer ") ? token : null;
+  } catch { return null; }
+}
+
+function uploadError(err) {
+  if (err.response?.status === 401) return "कृपया व्यवस्थापक खाते से दोबारा लॉगिन करें।";
+  if (err.response?.status === 403) return "इस खाते को कार्ड जोड़ने की अनुमति नहीं है।";
+  return "कार्ड सहेजा नहीं जा सका। विवरण सुरक्षित हैं; कृपया फिर कोशिश करें।";
+}
+
 const CreatePost = ({type1, type2}) =>{
     const [image, setImage] = useState([]);
+    const [error, setError] = useState("");
     const [imageUrls, setImageUrls] = useState([]);
     const [stock, setStock] = useState("");
     const [title, setTitle] = useState("");
@@ -24,16 +39,13 @@ const CreatePost = ({type1, type2}) =>{
     const [t2,setT2] = useState(type2[0].name)
     const finalPost = async (url) => {
         if(url && url.length>0){
-          const temp = sessionStorage.getItem("token");
-          let token;
-          if(temp){
-            token = JSON.parse(temp).data.token;
-          }
+          const token = storedToken();
+          if (!token) { setError("कृपया व्यवस्थापक खाते से लॉगिन करें।"); return; }
           if (url.length ==(Object.keys(imageUrls).length)) {
             setLoading(true)
             await axios
               .post(
-                "/createPost",
+                apiUrl("/createPost"),
                 {
                   cPrice,
                   sPrice,
@@ -56,7 +68,8 @@ const CreatePost = ({type1, type2}) =>{
               })
               .catch((err) =>{
                 setLoading(false)
-                 console.log(err)});
+                setError(uploadError(err));
+              });
             }
           }
       }
@@ -82,7 +95,7 @@ const CreatePost = ({type1, type2}) =>{
             })
             .catch((err) => {
               setLoading(false)
-              console.log(err);
+              setError("तस्वीर अपलोड नहीं हुई। कृपया फिर कोशिश करें।");
             });
           }
       }
@@ -112,6 +125,9 @@ const CreatePost = ({type1, type2}) =>{
       };
     
       const postToDB = async () => {
+        setError("");
+        if (!storedToken()) { setError("कृपया व्यवस्थापक खाते से लॉगिन करें।"); return; }
+        if (!imageUrls.length) { setError("कृपया कम से कम एक तस्वीर चुनें।"); return; }
         // const temp = sessionStorage.getItem("token");
         // const token = JSON.parse(temp).data.token;
         // console.log(token);
@@ -153,6 +169,7 @@ const CreatePost = ({type1, type2}) =>{
       }
     return (
         <div className="createPost-container container">
+          {error && <p role="alert">{error}</p>}
           {loading && <Loading/>}
             <div className="createPost-file-box">
               <input
