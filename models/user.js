@@ -14,6 +14,8 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  setupTokenHash: { type: String, select: false },
+  setupExpiresAt: { type: Number, select: false },
   date: {
     type: Date,
     default: Date.now,

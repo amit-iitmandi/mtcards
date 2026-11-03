@@ -25,6 +25,7 @@ function createApp({ database = mongoose, env = process.env, mountRoutes = true 
     require("./models/user");
     require("./models/post");
     app.use(require("./routes/auth"));
+    app.use(require("./routes/admin"));
     app.use(require("./routes/user"));
     app.use(require("./routes/post"));
   }
