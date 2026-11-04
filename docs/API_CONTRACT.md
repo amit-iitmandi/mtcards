@@ -1,6 +1,6 @@
 # MTcards API contract — backend delivery 1
 
-Status: implementation target. The deployed baseline is `deploy/render-backend` at d80556f; security PR #10 is not deployed. This contract is published before implementation. No production migration or seed is part of delivery.
+Status: implementation candidate tested with a disposable MongoDB 8 replica set. This contract was published in PR #16 before implementation. Production still runs the prior admin backend; provider-side release gates are recorded in OPERATIONS.md. No production migration or seed is part of delivery.
 
 Base URL: `https://mtcards-api.onrender.com`. JSON requests use `Content-Type: application/json`. Times are UTC ISO 8601; identifiers are strings; prices retain existing `cPrice` / `sPrice` strings (INR), without renaming historical values. Existing Post IDs and collection `posts` remain intact. New optional fields are additive. Anonymous responses exclude private prices; legacy `/allPost` remains temporarily compatible and must be retired after the frontend moves to `/cards`.
 
@@ -46,7 +46,7 @@ Returns 201 `{card:{_id:"...",title:"MT 205",stock:0,status:"draft",version:0,..
 
 Returns `{card:{...,version:1}}`. Metadata, prices, status and image ordering are allowlisted. `stock`, actor IDs, unknown fields and MongoDB operators are rejected. Conditional version update prevents lost changes; stale updates return 409. Omitting imageAssetIds preserves all historical image URLs. Replacing images only detaches old assets; physical removal is a separate checked operation. Every write has a sanitized audit event.
 
-`DELETE /admin/cards/:id` body `{expectedVersion:1}` archives the card, preserving references and inventory. No bulk-delete API. Legacy `DELETE /deletePost/:id` is changed to archive rather than physical removal. Archived records remain visible to admins. Frontend should label this action Archive.
+`DELETE /admin/cards/:id` body `{expectedVersion:1}` archives the card, preserving references and inventory. No bulk-delete API. Legacy `DELETE /deletePost/:id` is changed to archive rather than physical removal. Legacy `POST /createPost` is closed with 409 SIGNED_UPLOAD_REQUIRED; use POST /admin/cards after managed upload. Archived records remain visible to admins. Frontend should label this action Archive.
 
 ## Signed, validated image uploads
 
@@ -60,7 +60,7 @@ Missing Cloudinary configuration returns 503 before accepting upload bytes. Envi
 
 ## Inventory and sets
 
-Historical stock has not been silently reinterpreted or migrated. `GET /admin/inventory` returns `{items,total,page,limit}`. Each item includes `cardId,title,unit:"set",initialized,onHand,reserved,available,lowStockThreshold,version`; missing inventory is `initialized:false` with null balances, not zero.
+Historical stock has not been silently reinterpreted or migrated. `GET /admin/inventory?stock=low|out|available|unknown` returns `{items,total,page,limit}`. Each item includes `cardId,title,unit:"set",initialized,onHand,reserved,available,lowStockThreshold,version`; missing inventory is `initialized:false` with null balances, not zero.
 
 An admin explicitly confirms historical conversion once: `POST /admin/inventory/:cardId/initialize` with `{"unit":"set","onHand":100,"expectedLegacyStock":100,"lowStockThreshold":20}`. Reject if already initialized or legacy stock changed. Record the confirmation and balance in the movement ledger atomically. Existing historical stock is not changed by inspection. New cards are initialized at zero.
 

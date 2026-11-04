@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  sessionVersion: { type: Number, default: 0 },
   setupTokenHash: { type: String, select: false },
   setupExpiresAt: { type: Number, select: false },
   date: {

@@ -34,7 +34,7 @@ router.post("/login", async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user || !(await bcrypt.compare(userPass, user.password))) return res.status(401).json({ error: "Invalid email or password" });
-    jwt.sign({ id: user._id, name: user.name }, process.env.SECRET_OR_KEY, { algorithm: "HS256", expiresIn: "8h" }, (err, token) => {
+    jwt.sign({ id: user._id, name: user.name, sv: user.sessionVersion || 0 }, process.env.SECRET_OR_KEY, { algorithm: "HS256", expiresIn: "8h" }, (err, token) => {
       if (err) return res.status(503).json({ error: "Authentication unavailable" });
       return res.json({ success: true, token: "Bearer " + token });
     });
@@ -43,4 +43,13 @@ router.post("/login", async (req, res) => {
   }
 });
 
+const requireLogin = require('../middleware/requireLogin');
+router.get('/me', requireLogin, (req,res) => {
+  const allowed=(process.env.ADMIN_EMAILS||'').split(',').map(value=>value.trim().toLowerCase());
+  res.json({user:{id:req.user._id,name:req.user.name,email:req.user.email,isAdmin:allowed.includes(String(req.user.email).toLowerCase())}});
+});
+router.post('/logout', requireLogin, async (req,res,next) => {
+  try { await User.updateOne({_id:req.user._id},{$inc:{sessionVersion:1}});res.json({success:true}); }
+  catch(err){next(err);}
+});
 module.exports = router;

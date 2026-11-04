@@ -1,0 +1,35 @@
+# Backend release and recovery operations
+
+## Inspected baseline
+
+Render serves `mtcards_demo` on Atlas cluster `mtcards-demo`. Read-only inspection returned seven catalogue records on 2026-11-04. PR #10 remains an undeployed security candidate: its backend dependency upgrades, headers, limiter and scanner were brought forward while retaining the deployed administrator setup flow. Its frontend Vite migration is not bundled into this backend delivery. The old Cloudinary provider preset must be disabled at the provider, not merely removed from app code.
+
+This delivery contains no automatic record conversion, seed, destructive migration or history rewrite. New card metadata is additive. Existing stock balances require explicit admin confirmation as sets. Legacy card deletion now archives. Legacy POST /createPost is deliberately closed with SIGNED_UPLOAD_REQUIRED so it cannot bypass media authorization; the frontend must use the API contract before enabling publishing.
+
+## Secret/provider gates
+
+- The current Render JWT signing key was replaced privately on 2026-11-04. Existing bearer sessions must log in again. Never put the replacement in source, logs or browser config.
+- The application already uses a newly provisioned, narrowly scoped Atlas user for the demo database. This is not proof that the historical credential for the older cluster was revoked. That older project/account is not available through the connected Atlas project; its operator must revoke the exposed account and verify access denial there. Do not use exposed credentials as a test probe.
+- Cloudinary is not connected through an available management plugin. An owner must disable/revoke the old unsigned preset and any exposed API credentials in Cloudinary, then configure fresh CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in Render. Verify a real authorized image upload and removal before announcing media storage ready. Until configured, media endpoints return 503. No unsigned fallback.
+- Configure RESEND_API_KEY, a verified INQUIRY_NOTIFY_FROM sender, and owner-approved INQUIRY_NOTIFY_TO in Render. New inquiries persist even if mail is disabled or fails. Retry keeps the same provider idempotency key; refuse automated replay after 23 hours (inside Resend's 24-hour window). Treat ambiguous delivery outside that window as operator review, not a promise of exactly-once email.
+- Monitor /healthz (200 only with a connected database). Production 5xx logs contain only route template, status and server request ID. No request bodies, query strings, passwords, bearer tokens or provider keys are logged. Configure an external uptime alert/log drain for the owner's notification destination; no external alert integration has been provisioned by this PR.
+
+## Testing and release
+
+Run `npm ci --include=dev --ignore-scripts`, `npm run scan:secrets`, `npm audit --audit-level=high`, and `npm test`. Integration tests launch their own local MongoDB 8 replica set, use only a randomly named mtcards_test_* database, and verify rollback/concurrency against real persistence. `--nounixsocket` and disabled diagnostic data collection make the test server compatible with constrained containers; production MongoDB settings are unchanged. Tests never read DATABASE_ACCESS or contact the hosted database. Provider calls are replaced with isolated test adapters.
+
+Render build remains `npm ci --omit=dev --ignore-scripts && npm run test:security`, start `node server.js`. The real-database suite runs in the PR CI job with dev dependencies. Automatic deployment remains off. Do not merge/deploy without green checks and frontend API coordination. Roll back the code/config to the previous tested release if read-only health/catalogue/auth checks fail; do not restore or roll back stock balances as a code rollback.
+
+## Encrypted backup and tested recovery
+
+`node scripts/backup.js backup` reads an explicit BACKUP_SOURCE_DATABASE using BACKUP_MONGODB_URI (or the existing DATABASE_ACCESS) and writes an AES-256-GCM encrypted, gzipped BSON/EJSON snapshot to BACKUP_FILE. BACKUP_ENCRYPTION_KEY must be a privately supplied base64 32-byte key. Files are mode 0600, never overwritten, and never stored in Git. Backup reads use a snapshot transaction so collections' records share one consistent database snapshot. Collection options and index definitions are included; avoid concurrent schema/index changes during capture. Limits: 100,000 documents per collection and 128 MiB uncompressed total; larger databases require managed backup tooling or mongodump with a reviewed oplog strategy.
+
+Keep the encryption key separately from the encrypted artifact. Copy backups to a durable, access-controlled offsite store with retention; Render's /tmp and free service filesystem are ephemeral. No offsite destination or automatic backup schedule has been configured. Atlas documents an optional Free-cluster backup subscription; availability and pricing must be checked in the actual project. No managed backup subscription, offsite destination or billing change has been enabled. Choose retention/RPO/RTO with the owner before provisioning paid infrastructure.
+
+For a drill, set BACKUP_RESTORE_DATABASE to a new mtcards_restore_* name and run `node scripts/backup.js restore`. The tool refuses production names and nonempty targets, verifies the authenticated encrypted backup, restores documents/indexes and checks collection counts. A recovery integration test verifies preserved ObjectIds, stock, data counts, empty-target safety and wrong-key rejection on a separate local database. Never delete the live database to make a restore work. After an actual incident, restore to an isolated database, validate authentication/catalogue/inventory/audit totals, reconcile writes made after the snapshot, and perform an explicitly reviewed Render URI cutover. Preserve the prior database for investigation and rollback. Set transaction/backup timeout and capacity expectations before larger-scale deployment.
+
+## Limitations needing follow-up
+
+Process-local rate limits bound login/setup/inquiry/upload abuse and ignore untrusted forwarded headers. Behind a shared Render proxy this can conservatively throttle multiple users together. Multi-instance deployment needs a reviewed trusted-proxy configuration and shared limiter storage. Reservations are read-only zero for newly initialized inventory until order/reservation workflows are implemented. Shop settings/order fulfillment/GLB storage are outside this delivery. Ticket/media cleanup is recorded and retryable; no automatic orphan-purge job runs. Inquiry list/status endpoints are implemented, but custom domain sender verification and real provider delivery are still configuration gates.
+
+Provider references: [Cloudinary signed Node uploads](https://cloudinary.com/documentation/node_image_and_video_upload), [Resend idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys), [Atlas Free-cluster backups](https://www.mongodb.com/docs/atlas/backup/cloud-backup/free-cluster-backup/).
