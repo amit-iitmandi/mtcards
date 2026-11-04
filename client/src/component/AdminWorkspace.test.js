@@ -121,53 +121,83 @@ test('edit drafts are local only and publishing is disabled', () => {
   })).toBeDisabled();
   expect(axios.post).not.toHaveBeenCalled();
 });
-test('new card creation preserves zero stock and waits for valid server result', async () => {
-  axios.post.mockResolvedValue({
-    data: {
-      post: item
-    }
-  });
-  const {
-    container
-  } = render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
-  fireEvent.change(screen.getByLabelText('Card code'), {
-    target: {
-      value: '108'
-    }
-  });
-  fireEvent.change(screen.getByLabelText('Recorded stock'), {
-    target: {
-      value: '0'
-    }
-  });
-  fireEvent.change(screen.getByLabelText('Customer price · ₹'), {
-    target: {
-      value: '20'
-    }
-  });
-  fireEvent.change(screen.getByLabelText('Selling price · ₹'), {
-    target: {
-      value: '15'
-    }
-  });
-  fireEvent.change(screen.getByLabelText('Hosted image URL'), {
-    target: {
-      value: 'https://example.com/card.jpg'
-    }
-  });
-  fireEvent.click(screen.getByRole('button', {
-    name: 'Add image'
-  }));
+test('new card signs photos, uploads to the API and saves managed image IDs', async () => {
+  URL.createObjectURL = jest.fn(() => 'blob:card-preview');
+  URL.revokeObjectURL = jest.fn();
+  const assetId = 'b'.repeat(24);
+  axios.post.mockResolvedValueOnce({
+    data: { uploadUrl: '/admin/uploads?ticketId=' + 'a'.repeat(24) }
+  }).mockResolvedValueOnce({
+    data: { assets: [{ id: assetId, url: 'https://res.cloudinary.com/demo/image/upload/card.jpg' }] }
+  }).mockResolvedValueOnce({ data: { card: item } });
+  const { container } = render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
+  fireEvent.change(screen.getByLabelText('Card code'), { target: { value: '108' } });
+  fireEvent.change(screen.getByLabelText('Recorded stock'), { target: { value: '0' } });
+  fireEvent.change(screen.getByLabelText('Customer price · ₹'), { target: { value: '20' } });
+  fireEvent.change(screen.getByLabelText('Selling price · ₹'), { target: { value: '15' } });
+  const photo = new File(['jpeg'], 'card.jpg', { type: 'image/jpeg' });
+  fireEvent.change(container.querySelector('input[type=file]'), { target: { files: [photo] } });
   fireEvent.submit(container.querySelector('form'));
   expect(await screen.findByRole('status')).toHaveTextContent('Card created');
-  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/createPost'), expect.objectContaining({
-    stock: '0',
-    image: item.image
-  }), expect.objectContaining({
-    headers: {
-      Authorization: 'Bearer test'
-    }
-  }));
+  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/admin/uploads/sign'), {
+    files: [{ mimeType: 'image/jpeg', size: photo.size }]
+  }, expect.objectContaining({ headers: { Authorization: 'Bearer test' } }));
+  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/admin/cards'),
+    expect.objectContaining({ title: '108', imageAssetIds: [assetId], status: 'published' }),
+    expect.objectContaining({ headers: { Authorization: 'Bearer test' } }));
+  expect(axios.post.mock.calls[1][1]).toBeInstanceOf(FormData);
+  expect(axios.post).toHaveBeenCalledTimes(3);
+});
+
+test('invalid photo is rejected before any network request', async () => {
+  URL.createObjectURL = jest.fn(() => 'blob:bad-preview');
+  const { container } = render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
+  const photo = new File(['<svg/>'], 'unsafe.svg', { type: 'image/svg+xml' });
+  fireEvent.change(container.querySelector('input[type=file]'), { target: { files: [photo] } });
+  expect(await screen.findByRole('alert')).toHaveTextContent('JPG, PNG or WebP');
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
+test('backend upload outage preserves photo selection and entered details', async () => {
+  URL.createObjectURL = jest.fn(() => 'blob:outage-preview');
+  URL.revokeObjectURL = jest.fn();
+  axios.post.mockRejectedValueOnce({ response: { status: 503 } });
+  const { container } = render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
+  fireEvent.change(screen.getByLabelText('Card code'), { target: { value: '250' } });
+  fireEvent.change(screen.getByLabelText('Recorded stock'), { target: { value: '0' } });
+  fireEvent.change(screen.getByLabelText('Customer price · ₹'), { target: { value: '20' } });
+  fireEvent.change(screen.getByLabelText('Selling price · ₹'), { target: { value: '15' } });
+  fireEvent.change(container.querySelector('input[type=file]'), { target: { files: [new File(['x'], 'card.jpg', { type: 'image/jpeg' })] } });
+  fireEvent.submit(container.querySelector('form'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('not configured');
+  expect(screen.getByLabelText('Card code')).toHaveValue('250');
+  expect(screen.getByAltText('card.jpg')).toBeInTheDocument();
+  expect(axios.post).toHaveBeenCalledTimes(1);
+});
+
+test('stock failure cannot create a second card and can safely retry same adjustment', async () => {
+  URL.createObjectURL = jest.fn(() => 'blob:stock-preview');
+  URL.revokeObjectURL = jest.fn();
+  const assetId = 'b'.repeat(24);
+  axios.post.mockResolvedValueOnce({ data: { uploadUrl: '/admin/uploads?ticketId=' + 'a'.repeat(24) } })
+    .mockResolvedValueOnce({ data: { assets: [{ id: assetId, url: 'https://res.cloudinary.com/demo/image/upload/card.jpg' }] } })
+    .mockResolvedValueOnce({ data: { card: item } })
+    .mockRejectedValueOnce(new Error('connection lost'))
+    .mockResolvedValueOnce({ data: { inventory: { onHand: 5 } } });
+  const { container } = render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
+  fireEvent.change(screen.getByLabelText('Card code'), { target: { value: '108' } });
+  fireEvent.change(screen.getByLabelText('Recorded stock'), { target: { value: '5' } });
+  fireEvent.change(screen.getByLabelText('Customer price · ₹'), { target: { value: '20' } });
+  fireEvent.change(screen.getByLabelText('Selling price · ₹'), { target: { value: '15' } });
+  fireEvent.change(container.querySelector('input[type=file]'), { target: { files: [new File(['x'], 'card.jpg', { type: 'image/jpeg' })] } });
+  fireEvent.submit(container.querySelector('form'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('stock is not confirmed');
+  const before = axios.post.mock.calls[3][1];
+  expect(screen.getByRole('button', { name: 'Card saved · stock pending' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry stock update' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Card created');
+  expect(axios.post.mock.calls[4][1]).toEqual(before);
+  expect(axios.post).toHaveBeenCalledTimes(5);
 });
 test('enquiry composer does not send network requests or claim delivery', () => {
   render(<MemoryRouter initialEntries={['/enquiry?card=MT.%20108']}><EnquiryPage /></MemoryRouter>);
