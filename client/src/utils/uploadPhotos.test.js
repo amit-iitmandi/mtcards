@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { uploadPhotos, validateImages } from './uploadPhotos';
+import { uploadPhotos, validateImages, uploadErrorText } from './uploadPhotos';
 jest.mock('axios');
 
 beforeEach(() => jest.clearAllMocks());
@@ -34,4 +34,16 @@ test('multiple photos are uploaded together under one signed ticket', async () =
   });
   expect(axios.post.mock.calls[1][1]).toBeInstanceOf(FormData);
   expect(axios.post.mock.calls[1][2].headers).toEqual({ Authorization: 'Bearer token' });
+});
+
+test('server provider failure codes guide safe troubleshooting without exposing messages', () => {
+  const auth = uploadErrorText({ response: { status: 503, data: { code: 'IMAGE_HOST_AUTH_FAILED', error: 'private upstream message' } } });
+  expect(auth).toMatch(/Cloudinary rejected the server credentials/);
+  expect(auth).not.toMatch(/private upstream/);
+  const cloud = uploadErrorText({ response: { status: 503, data: { code: 'IMAGE_HOST_CLOUD_NOT_FOUND' } } });
+  expect(cloud).toMatch(/CLOUDINARY_CLOUD_NAME/);
+  const network = uploadErrorText({ response: { status: 503, data: { code: 'IMAGE_HOST_NETWORK_ERROR' } } });
+  expect(network).toMatch(/could not connect/);
+  expect(uploadErrorText({ response: { status: 503, data: { code: 'UNKNOWN' } } }))
+    .toMatch(/temporarily unavailable/);
 });
