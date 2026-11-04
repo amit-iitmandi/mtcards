@@ -15,6 +15,40 @@ const types = {
   "image/png": "png",
   "image/webp": "webp",
 };
+// Provider errors are untrusted: emit only fixed categories and numeric HTTP status.
+function classifyProviderUploadError(err) {
+  const rawStatus = err?.http_code ?? err?.error?.http_code ?? err?.statusCode;
+  const status = Number(rawStatus);
+  const httpStatus = Number.isInteger(status) && status >= 400 && status <= 599 ? status : null;
+  const message = String(err?.message || err?.error?.message || '').slice(0, 400);
+  if (httpStatus === 401 || httpStatus === 403 ||
+      /invalid api key|invalid signature|authentication failed|unauthorized/i.test(message)) {
+    return { code: 'IMAGE_HOST_AUTH_FAILED', category: 'authentication', httpStatus };
+  }
+  if (httpStatus === 404 || /cloud not found|invalid cloud name|unknown cloud/i.test(message)) {
+    return { code: 'IMAGE_HOST_CLOUD_NOT_FOUND', category: 'cloud', httpStatus };
+  }
+  if (httpStatus === 413) {
+    return { code: 'IMAGE_HOST_FILE_REJECTED', category: 'limit', httpStatus };
+  }
+  if (httpStatus === 429) {
+    return { code: 'IMAGE_HOST_RATE_LIMITED', category: 'rate_limit', httpStatus };
+  }
+  if (['ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(err?.code) ||
+      /socket hang up|network timeout/i.test(message)) {
+    return { code: 'IMAGE_HOST_NETWORK_ERROR', category: 'network', httpStatus };
+  }
+  return { code: 'IMAGE_HOST_UPLOAD_FAILED', category: 'unknown', httpStatus };
+}
+function logProviderFailure(result) {
+  // Never log Cloudinary's error message: it can contain account information.
+  console.error(JSON.stringify({
+    event: 'media.provider.upload_failed',
+    category: result.category,
+    providerStatus: result.httpStatus,
+  }));
+}
+
 let provider;
 function configured() {
   return !!(
@@ -151,6 +185,7 @@ async function upload(ticketId, files, owner) {
   );
   if (!claim) fail(409, "UPLOAD_TICKET_INVALID", "Upload ticket already used");
   const assets = [];
+  let providerFailure = null;
   try {
     for (const file of files) {
       const publicId = "mtcards/" + randomUUID();
@@ -158,6 +193,8 @@ async function upload(ticketId, files, owner) {
       try {
         result = await client().upload(file.buffer, publicId);
       } catch (err) {
+        providerFailure = classifyProviderUploadError(err);
+        logProviderFailure(providerFailure);
         await Asset.create({ owner, publicId, state: "cleanup" });
         throw err;
       }
@@ -170,6 +207,8 @@ async function upload(ticketId, files, owner) {
         )
           throw Error("Unexpected provider response");
       } catch (err) {
+        providerFailure = { code: 'IMAGE_HOST_UPLOAD_FAILED', category: 'invalid_response', httpStatus: null };
+        logProviderFailure(providerFailure);
         await Asset.create({ owner, publicId, state: "cleanup" });
         throw err;
       }
@@ -221,7 +260,7 @@ async function upload(ticketId, files, owner) {
     await Ticket.updateOne({ _id: ticketId }, { $set: { state: "failed" } });
     fail(
       503,
-      "DEPENDENCY_UNAVAILABLE",
+      providerFailure?.code || "DEPENDENCY_UNAVAILABLE",
       "Image upload failed; cleanup is recorded",
     );
   }
@@ -270,6 +309,7 @@ module.exports = {
   validate,
   remove,
   requireProvider,
+  classifyProviderUploadError,
   setTestProvider: (value) => {
     provider = value;
   },
