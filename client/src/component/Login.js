@@ -23,14 +23,14 @@ export default function Login() {
       await axios.get(apiUrl('/admin/session'), { headers: { Authorization: data.token }, timeout: 15000 });
       if (!active.current) return;
       sessionStorage.setItem('token', JSON.stringify({ data: { token: data.token } }));
-      setPassword(''); history.replace('/upload');
+      setPassword(''); history.replace('/admin');
     } catch (err) {
       if (!active.current) return;
       sessionStorage.removeItem('token');
       setError(err.response?.status === 403 ? 'इस खाते को व्यवस्थापक की अनुमति नहीं है।' : err.response?.status === 401 ? 'ईमेल या पासवर्ड सही नहीं है।' : 'लॉगिन अभी उपलब्ध नहीं है। कृपया फिर कोशिश करें।');
     } finally { if (active.current) setBusy(false); }
   }
-  return <main className="admin-page"><section className="admin-panel">
+  return <main className="admin-page auth-editorial"><aside className="auth-story" style={{backgroundImage:"linear-gradient(#351d2699,#351d26bb),url(/images/wedding-story-800.webp)"}}><span>MAA TARA · SHOP STUDIO</span><h2>खूबसूरत निमंत्रण।<br/><em>सलीके से कारोबार।</em></h2><p>आपके कार्ड, आपका स्टॉक, आपकी अपनी जगह।</p><Link to="/">स्टोर पर वापस जाएँ ↗</Link></aside><section className="admin-panel">
     <p className="eyebrow">माँ तारा कार्ड पैलेस</p><h1>व्यवस्थापक लॉगिन</h1>
     <p>कार्ड के विवरण और तस्वीरें जोड़ने के लिए प्रवेश करें।</p>
     {location.state?.passwordCreated && <p role="status">पासवर्ड तैयार है। अब अपने खाते से लॉगिन करें।</p>}
