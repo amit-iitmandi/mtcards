@@ -9,11 +9,11 @@ jest.mock('./CreatePost', () => () => <div>Protected editor</div>);
 const beforeBase=process.env.REACT_APP_API_BASE_URL;
 beforeEach(()=>{jest.clearAllMocks();sessionStorage.clear();process.env.REACT_APP_API_BASE_URL='https://api.example.com';});
 afterEach(()=>{if(beforeBase===undefined)delete process.env.REACT_APP_API_BASE_URL;else process.env.REACT_APP_API_BASE_URL=beforeBase;});
-function page(Component,start='/login'){return render(<MemoryRouter initialEntries={[start]}><Switch><Route path="/done"><div>Done</div></Route><Route exact path="/upload">{start==='/upload'?<AdminUpload />:<div>Upload destination</div>}</Route><Route exact path="/login">{start==='/login'?<Login />:<div>Login destination</div>}</Route><Route><Component /></Route></Switch></MemoryRouter>);}
+function page(Component,start='/login'){return render(<MemoryRouter initialEntries={[start]}><Switch><Route exact path="/admin"><div>Admin destination</div></Route><Route path="/done"><div>Done</div></Route><Route exact path="/upload">{start==='/upload'?<AdminUpload />:<div>Upload destination</div>}</Route><Route exact path="/login">{start==='/login'?<Login />:<div>Login destination</div>}</Route><Route><Component /></Route></Switch></MemoryRouter>);}
 function fillLogin(){fireEvent.change(screen.getByLabelText('ईमेल'),{target:{value:'admin@example.com'}});fireEvent.change(screen.getByLabelText('पासवर्ड'),{target:{value:'test-password'}});fireEvent.click(screen.getByRole('button',{name:'लॉगिन करें'}));}
 test('login verifies admin role before storing session and redirecting',async()=>{
  axios.post.mockResolvedValue({data:{token:'Bearer test-token'}});axios.get.mockResolvedValue({data:{email:'admin@example.com'}});
- page(Login);fillLogin();expect(await screen.findByText('Upload destination')).toBeInTheDocument();
+ page(Login);fillLogin();expect(await screen.findByText('Admin destination')).toBeInTheDocument();
  expect(axios.post).toHaveBeenCalledWith('https://api.example.com/login',{email:'admin@example.com',userPass:'test-password'},{timeout:15000});
  expect(axios.get).toHaveBeenCalledWith('https://api.example.com/admin/session',{headers:{Authorization:'Bearer test-token'},timeout:15000});
  expect(JSON.parse(sessionStorage.getItem('token')).data.token).toBe('Bearer test-token');
