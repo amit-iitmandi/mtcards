@@ -22,7 +22,7 @@ Frontend branch: `design/admin-workspace`, based on `feature/admin-login` (PR #1
 | POST | `/createPost` | existing product fields -> 201 `{post:{…}}` |
 | DELETE | `/deletePost/:id` | bearer admin; `{success:true}`; explicit confirmation in UI |
 
-Creation accepts hosted HTTPS image URLs. Local file selection is a preview only until secure upload is implemented. No new unsigned uploads were added. Existing legacy CreatePost implementation is retained for regression compatibility but is no longer mounted by App routes.
+On branch `fix/signed-admin-image-upload`, new-card creation requires local JPG/PNG/WebP photos and sends them to the authenticated two-step `/admin/uploads/sign` + multipart `/admin/uploads` API, then attaches returned `imageAssetIds` to `POST /admin/cards` with `status:published`. Initial stock above zero is recorded using an idempotent `POST /admin/inventory/:cardId/adjustments` request; a failed or ambiguous stock response is explicitly retryable without making another card. Existing legacy CreatePost remains unmounted by App routes and must not be re-enabled.
 
 ## Needed APIs (proposed, not called by this frontend yet)
 
@@ -61,3 +61,11 @@ Test anonymous/non-admin denials, admin create/update/archive, referenced delete
 ## Integration work remaining in frontend after backend delivery
 
 Wire PATCH/save/publish, secure upload, stock movement forms/history, inquiry lists/status changes and editable shop settings to the agreed endpoints. Current session drafts are local convenience only, not shared records. Do not enable disabled publish controls until those flows are tested.
+
+## Secure upload rollout gate (branch fix/signed-admin-image-upload)
+
+- Backend PR #17 (`backend/card-stock-media-api`) implements the required authenticated API; it has **not been deployed** merely by opening this frontend PR. Deploy backend first, after owner-managed Cloudinary setup.
+- Render service must have `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` configured privately. Disable the legacy unsigned `card_img` preset in Cloudinary provider settings; never put signing credentials or unsigned preset in frontend.
+- A returned upload URL is accepted only if it matches a same-origin relative `/admin/uploads?ticketId=...` path, avoiding bearer token exfiltration. Size constraints: 12 images, 5 MiB/file, 25 MiB total, JPEG/PNG/WebP only; backend must validate actual bytes.
+- Before public promotion, smoke-test an authenticated admin upload, a denied anonymous upload, one card with multiple images, initial stock >0, and deliberate Cloudinary failure (503). Verify Vercel `REACT_APP_API_BASE_URL` points to the Render API and CORS permits `https://mtcards.in`.
+- This frontend PR changes no deployed service, MongoDB records, or Cloudinary configuration. The live site will continue to show the existing upload limitation until compatible backend and frontend are deployed.
