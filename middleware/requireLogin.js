@@ -16,6 +16,7 @@ module.exports = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid token" });
     }
     const user = await User.findById(payload.id);
+    if (user && (payload.sv || 0) !== (user.sessionVersion || 0)) return res.status(401).json({ error: "Session expired" });
     if (!user) return res.status(401).json({ error: "Invalid token" });
     req.user = user;
     return next();

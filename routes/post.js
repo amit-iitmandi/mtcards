@@ -7,19 +7,12 @@ const validatePost = require("../utils/validatePost");
 const Post = mongoose.model("Post");
 
 router.post("/createPost", requireAdmin, async (req, res) => {
-  const fields = validatePost(req.body);
-  if (!fields) return res.status(400).json({ error: "Invalid product data" });
-  try {
-    const post = await new Post(fields).save();
-    return res.status(201).json({ post });
-  } catch (err) {
-    return res.status(500).json({ error: "Could not save product" });
-  }
+  return res.status(409).json({error:"Use signed uploads and POST /admin/cards",code:"SIGNED_UPLOAD_REQUIRED"});
 });
 
 router.get("/allPost", async (req, res) => {
   try {
-    const posts = await Post.find().sort({ title: 1 });
+    const posts = await Post.find({status:{$ne:"archived"}}).sort({ title: 1 });
     return res.json(posts);
   } catch (err) {
     return res.status(500).json({ error: "Could not load products" });
@@ -43,9 +36,10 @@ router.delete("/deletePost/:postId", requireAdmin, async (req, res) => {
     return res.status(400).json({ error: "Invalid product ID" });
   }
   try {
-    const post = await Post.findByIdAndDelete(req.params.postId);
-    if (!post) return res.status(404).json({ error: "Product not found" });
-    return res.json({ success: true });
+    const existing = await Post.findById(req.params.postId).lean();
+    if (!existing) return res.status(404).json({error:"Product not found"});
+    await require('../services/cards').update(req.params.postId,{expectedVersion:existing.version||0,status:'archived'},req.user._id);
+    return res.json({success:true,archived:true});
   } catch (err) {
     return res.status(500).json({ error: "Could not delete product" });
   }

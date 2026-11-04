@@ -15,7 +15,22 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci --omit=dev --ignore-scripts
+      - run: npm run scan:secrets
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run test:security
+  database-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci --include=dev --ignore-scripts
+      - run: npm run test:integration
+        env:
+          MONGOMS_DOWNLOAD_IGNORE_MISSING_HEADER: 'true'
       - run: node --check routes/post.js && node --check middleware/requireLogin.js && node --check middleware/requireAdmin.js
   frontend-build:
     runs-on: ubuntu-latest
@@ -30,5 +45,5 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm ci
         working-directory: client
-      - run: CI=false npm run build
+      - run: CI=false NODE_OPTIONS=--openssl-legacy-provider npm run build
         working-directory: client
