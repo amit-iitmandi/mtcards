@@ -70,7 +70,24 @@ export function uploadErrorText(error) {
   if (error?.response?.status === 413 || error?.response?.status === 415 || error?.response?.status === 422) {
     return error?.response?.data?.error || 'These photos were rejected. Choose JPG, PNG or WebP files within the size limit.';
   }
-  if (error?.response?.status === 503) return 'Secure image storage is not configured or is temporarily unavailable on the backend.';
+  if (error?.response?.status === 503) {
+    switch (error?.response?.data?.code) {
+      case 'IMAGE_HOST_AUTH_FAILED':
+        return 'Cloudinary rejected the server credentials. Please check the Cloudinary cloud name, API key and API secret in Render, then retry.';
+      case 'IMAGE_HOST_CLOUD_NOT_FOUND':
+        return 'Cloudinary could not find the configured cloud. Check CLOUDINARY_CLOUD_NAME in Render.';
+      case 'IMAGE_HOST_FILE_REJECTED':
+        return 'Cloudinary rejected this image. Try a smaller JPG, PNG or WebP file.';
+      case 'IMAGE_HOST_RATE_LIMITED':
+        return 'Cloudinary is temporarily rate limiting uploads. Please retry later.';
+      case 'IMAGE_HOST_NETWORK_ERROR':
+        return 'The backend could not connect to Cloudinary. Please retry.';
+      case 'IMAGE_HOST_UPLOAD_FAILED':
+        return 'Cloudinary rejected the image upload. Please contact the administrator with the request ID.';
+      default:
+        return 'Secure image storage is not configured or is temporarily unavailable on the backend.';
+    }
+  }
   if (error?.response?.status === 404 || error?.response?.status === 405 ||
       error?.response?.data?.code === 'SIGNED_UPLOAD_REQUIRED') {
     return 'The backend image-upload update has not been deployed yet. Your card details are still here.';
