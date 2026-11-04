@@ -138,7 +138,7 @@ test('new card signs photos, uploads to the API and saves managed image IDs', as
   const photo = new File(['jpeg'], 'card.jpg', { type: 'image/jpeg' });
   fireEvent.change(container.querySelector('input[type=file]'), { target: { files: [photo] } });
   fireEvent.submit(container.querySelector('form'));
-  expect(await screen.findByRole('status')).toHaveTextContent('Card created');
+  await waitFor(() => expect(screen.getByText(/Card created in the catalogue/)).toBeInTheDocument());
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/admin/uploads/sign'), {
     files: [{ mimeType: 'image/jpeg', size: photo.size }]
   }, expect.objectContaining({ headers: { Authorization: 'Bearer test' } }));
@@ -195,7 +195,7 @@ test('stock failure cannot create a second card and can safely retry same adjust
   const before = axios.post.mock.calls[3][1];
   expect(screen.getByRole('button', { name: 'Card saved · stock pending' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Retry stock update' }));
-  expect(await screen.findByRole('status')).toHaveTextContent('Card created');
+  await waitFor(() => expect(screen.getByText(/Card created in the catalogue/)).toBeInTheDocument());
   expect(axios.post.mock.calls[4][1]).toEqual(before);
   expect(axios.post).toHaveBeenCalledTimes(5);
 });
