@@ -54,7 +54,13 @@ before(async () => {
     (testProvider = {
       upload: async (buffer, publicId) => {
         uploads++;
-        if (failUpload) throw Error("private provider failure");
+        if (failUpload) {
+          const error = new Error("private provider failure: never return this message");
+          if (failUpload === "auth") error.http_code = 401;
+          if (failUpload === "cloud") error.http_code = 404;
+          if (failUpload === "rate") error.http_code = 429;
+          throw error;
+        }
         return {
           public_id: publicId,
           secure_url:
@@ -485,6 +491,24 @@ test("asset from another admin cannot attach; failed upload is recorded for clea
   assert.equal(result.response.status, 503);
   assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
 });
+test("Cloudinary authentication failure reports a safe actionable error code", async () => {
+  failUpload = "auth";
+  const result = await imageAsset();
+  assert.equal(result.response.status, 503);
+  assert.equal(result.response.body.code, "IMAGE_HOST_AUTH_FAILED");
+  assert.doesNotMatch(JSON.stringify(result.response.body), /private provider failure/i);
+  assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
+});
+
+test("Cloudinary upload failure categories are fixed and do not include untrusted messages", () => {
+  const { classifyProviderUploadError } = require("../services/media");
+  assert.equal(classifyProviderUploadError({ http_code: 404, message: "private cloud" }).code, "IMAGE_HOST_CLOUD_NOT_FOUND");
+  assert.equal(classifyProviderUploadError({ http_code: 429 }).code, "IMAGE_HOST_RATE_LIMITED");
+  assert.equal(classifyProviderUploadError({ code: "ENOTFOUND" }).code, "IMAGE_HOST_NETWORK_ERROR");
+  assert.equal(classifyProviderUploadError(new Error("secret=private-password")).code, "IMAGE_HOST_UPLOAD_FAILED");
+  assert.equal(classifyProviderUploadError(new Error("secret=private-password")).category, "unknown");
+});
+
 test("inquiry persistence survives notification failure; retries deduplicate and status edits use versions", async () => {
   const card = await legacy();
   failNotification = true;
