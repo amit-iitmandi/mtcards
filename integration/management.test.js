@@ -491,13 +491,25 @@ test("asset from another admin cannot attach; failed upload is recorded for clea
   assert.equal(result.response.status, 503);
   assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
 });
-test("Cloudinary authentication failure reports a safe actionable error code", async () => {
+test("Cloudinary authentication failure probes Admin API without disclosing provider secrets", async () => {
   failUpload = "auth";
-  const result = await imageAsset();
-  assert.equal(result.response.status, 503);
-  assert.equal(result.response.body.code, "IMAGE_HOST_AUTH_FAILED");
-  assert.doesNotMatch(JSON.stringify(result.response.body), /private provider failure/i);
-  assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
+  let probes = 0;
+  testProvider.ping = async () => {
+    probes++;
+    const error = new Error("sensitive authentication information");
+    error.http_code = 401;
+    throw error;
+  };
+  try {
+    const result = await imageAsset();
+    assert.equal(result.response.status, 503);
+    assert.equal(result.response.body.code, "IMAGE_HOST_AUTH_FAILED");
+    assert.doesNotMatch(JSON.stringify(result.response.body), /sensitive|private provider failure/i);
+    assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
+    assert.equal(probes, 1);
+  } finally {
+    delete testProvider.ping;
+  }
 });
 
 test("Cloudinary upload failure categories are fixed and do not include untrusted messages", () => {
@@ -510,6 +522,17 @@ test("Cloudinary upload failure categories are fixed and do not include untruste
   assert.equal(classifyProviderUploadError({ http_code: 401, message: 'Invalid api_key' }).authHint, 'invalid_api_key');
   assert.equal(classifyProviderUploadError({ http_code: 401, message: 'API secret mismatch' }).authHint, 'secret_mismatch');
   assert.equal(classifyProviderUploadError({ http_code: 401, message: 'Unexpected error: sensitive details' }).authHint, 'unclassified');
+  const { classifyAuthProbeError } = require('../services/media');
+  assert.deepEqual(classifyAuthProbeError({ http_code: 401, message: 'private credentials' }), {
+    adminApi: 'authentication_failed', providerStatus: 401,
+  });
+  assert.deepEqual(classifyAuthProbeError({ http_code: 403, message: 'private policy' }), {
+    adminApi: 'permission_denied', providerStatus: 403,
+  });
+  assert.deepEqual(classifyAuthProbeError({ code: 'ETIMEDOUT', message: 'private url' }), {
+    adminApi: 'unavailable', providerStatus: null,
+  });
+  assert.doesNotMatch(JSON.stringify(classifyAuthProbeError({ http_code: 401, message: 'private credentials' })), /private/);
   const { credentialFormatIssues } = require('../services/media');
   const sample = { CLOUDINARY_CLOUD_NAME: 'demo', CLOUDINARY_API_KEY: ' "example" ', CLOUDINARY_API_SECRET: 'private-example' };
   assert.deepEqual(credentialFormatIssues(sample), ['CLOUDINARY_API_KEY']);

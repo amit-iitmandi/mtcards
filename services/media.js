@@ -76,6 +76,48 @@ function logProviderFailure(result) {
 }
 
 let provider;
+let lastAuthProbeAt = 0;
+
+// This is a read-only Cloudinary Admin API request. It differentiates an
+// invalid cloud/key/secret combination from an Upload-API-specific signature
+// problem without exposing the actual provider response or credentials.
+function classifyAuthProbeError(err) {
+  const raw = err?.http_code ?? err?.error?.http_code ?? err?.statusCode;
+  const code = Number(raw);
+  const providerStatus = Number.isInteger(code) && code >= 400 && code <= 599 ? code : null;
+  return {
+    adminApi: providerStatus === 401 ? 'authentication_failed'
+      : providerStatus === 403 ? 'permission_denied' : 'unavailable',
+    providerStatus,
+  };
+}
+async function probeAuthOnFailure() {
+  // Avoid excessive authenticated Admin API calls during repeated failed uploads.
+  if (Date.now() - lastAuthProbeAt < 10 * 60 * 1000) return;
+  lastAuthProbeAt = Date.now();
+  const active = client();
+  if (typeof active.ping !== 'function') return; // Isolated mocked upload providers.
+  let timeout;
+  try {
+    const result = await Promise.race([
+      Promise.resolve().then(() => active.ping()),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('Admin API probe timed out')), 5000);
+      }),
+    ]);
+    console.error(JSON.stringify({
+      event: 'media.provider.auth_probe',
+      adminApi: result?.status === 'ok' ? 'authenticated' : 'unexpected_response',
+    }));
+  } catch (err) {
+    console.error(JSON.stringify({
+      event: 'media.provider.auth_probe',
+      ...classifyAuthProbeError(err),
+    }));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 function configured() {
   return !!(
     process.env.CLOUDINARY_CLOUD_NAME &&
@@ -112,6 +154,7 @@ function client() {
         resource_type: "image",
         invalidate: true,
       }),
+    ping: () => cloudinary.api.ping(),
   };
 }
 function requireProvider() {
@@ -221,6 +264,7 @@ async function upload(ticketId, files, owner) {
       } catch (err) {
         providerFailure = classifyProviderUploadError(err);
         logProviderFailure(providerFailure);
+        if (providerFailure.httpStatus === 401) await probeAuthOnFailure();
         await Asset.create({ owner, publicId, state: "cleanup" });
         throw err;
       }
@@ -336,6 +380,7 @@ module.exports = {
   remove,
   requireProvider,
   classifyProviderUploadError,
+  classifyAuthProbeError,
   credentialFormatIssues,
   setTestProvider: (value) => {
     provider = value;
