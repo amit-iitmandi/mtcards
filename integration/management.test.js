@@ -510,6 +510,17 @@ test("Cloudinary upload failure categories are fixed and do not include untruste
   assert.equal(classifyProviderUploadError({ http_code: 401, message: 'Invalid api_key' }).authHint, 'invalid_api_key');
   assert.equal(classifyProviderUploadError({ http_code: 401, message: 'API secret mismatch' }).authHint, 'secret_mismatch');
   assert.equal(classifyProviderUploadError({ http_code: 401, message: 'Unexpected error: sensitive details' }).authHint, 'unclassified');
+  const { classifyAuthProbeError } = require('../services/media');
+  assert.deepEqual(classifyAuthProbeError({ http_code: 401, message: 'private credentials' }), {
+    adminApi: 'authentication_failed', providerStatus: 401,
+  });
+  assert.deepEqual(classifyAuthProbeError({ http_code: 403, message: 'private policy' }), {
+    adminApi: 'permission_denied', providerStatus: 403,
+  });
+  assert.deepEqual(classifyAuthProbeError({ code: 'ETIMEDOUT', message: 'private url' }), {
+    adminApi: 'unavailable', providerStatus: null,
+  });
+  assert.doesNotMatch(JSON.stringify(classifyAuthProbeError({ http_code: 401, message: 'private credentials' })), /private/);
   const { credentialFormatIssues } = require('../services/media');
   const sample = { CLOUDINARY_CLOUD_NAME: 'demo', CLOUDINARY_API_KEY: ' "example" ', CLOUDINARY_API_SECRET: 'private-example' };
   assert.deepEqual(credentialFormatIssues(sample), ['CLOUDINARY_API_KEY']);
