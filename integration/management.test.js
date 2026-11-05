@@ -491,13 +491,25 @@ test("asset from another admin cannot attach; failed upload is recorded for clea
   assert.equal(result.response.status, 503);
   assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
 });
-test("Cloudinary authentication failure reports a safe actionable error code", async () => {
+test("Cloudinary authentication failure probes Admin API without disclosing provider secrets", async () => {
   failUpload = "auth";
-  const result = await imageAsset();
-  assert.equal(result.response.status, 503);
-  assert.equal(result.response.body.code, "IMAGE_HOST_AUTH_FAILED");
-  assert.doesNotMatch(JSON.stringify(result.response.body), /private provider failure/i);
-  assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
+  let probes = 0;
+  testProvider.ping = async () => {
+    probes++;
+    const error = new Error("sensitive authentication information");
+    error.http_code = 401;
+    throw error;
+  };
+  try {
+    const result = await imageAsset();
+    assert.equal(result.response.status, 503);
+    assert.equal(result.response.body.code, "IMAGE_HOST_AUTH_FAILED");
+    assert.doesNotMatch(JSON.stringify(result.response.body), /sensitive|private provider failure/i);
+    assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
+    assert.equal(probes, 1);
+  } finally {
+    delete testProvider.ping;
+  }
 });
 
 test("Cloudinary upload failure categories are fixed and do not include untrusted messages", () => {
