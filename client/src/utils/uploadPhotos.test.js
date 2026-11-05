@@ -38,8 +38,12 @@ test('multiple photos are uploaded together under one signed ticket', async () =
 
 test('server provider failure codes guide safe troubleshooting without exposing messages', () => {
   const auth = uploadErrorText({ response: { status: 503, data: { code: 'IMAGE_HOST_AUTH_FAILED', error: 'private upstream message' } } });
-  expect(auth).toMatch(/Cloudinary rejected the server credentials/);
+  expect(auth).toMatch(/could not authenticate the server/);
   expect(auth).not.toMatch(/private upstream/);
+  const blocked = uploadErrorText({ response: { status: 503, data: { code: 'IMAGE_HOST_ACCESS_RESTRICTED', error: 'private upstream response' } } });
+  expect(blocked).toMatch(/credentials may be correct/i);
+  expect(blocked).toMatch(/upload permissions/i);
+  expect(blocked).not.toMatch(/private upstream/);
   const cloud = uploadErrorText({ response: { status: 503, data: { code: 'IMAGE_HOST_CLOUD_NOT_FOUND' } } });
   expect(cloud).toMatch(/CLOUDINARY_CLOUD_NAME/);
   const network = uploadErrorText({ response: { status: 503, data: { code: 'IMAGE_HOST_NETWORK_ERROR' } } });
