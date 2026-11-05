@@ -73,7 +73,9 @@ export function uploadErrorText(error) {
   if (error?.response?.status === 503) {
     switch (error?.response?.data?.code) {
       case 'IMAGE_HOST_AUTH_FAILED':
-        return 'Cloudinary rejected the server credentials. Please check the Cloudinary cloud name, API key and API secret in Render, then retry.';
+        return 'Cloudinary could not authenticate the server (401). Confirm the Cloudinary API key and secret belong to the same product environment, and redeploy the Render backend.';
+      case 'IMAGE_HOST_ACCESS_RESTRICTED':
+        return 'Cloudinary blocked the upload (403). Your credentials may be correct. Check Cloudinary account status, upload permissions, restrictions and allowed upload settings, then retry.';
       case 'IMAGE_HOST_CLOUD_NOT_FOUND':
         return 'Cloudinary could not find the configured cloud. Check CLOUDINARY_CLOUD_NAME in Render.';
       case 'IMAGE_HOST_FILE_REJECTED':
