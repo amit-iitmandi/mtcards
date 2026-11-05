@@ -57,6 +57,7 @@ before(async () => {
         if (failUpload) {
           const error = new Error("private provider failure: never return this message");
           if (failUpload === "auth") error.http_code = 401;
+          if (failUpload === "restricted") error.http_code = 403;
           if (failUpload === "cloud") error.http_code = 404;
           if (failUpload === "rate") error.http_code = 429;
           throw error;
@@ -500,8 +501,17 @@ test("Cloudinary authentication failure reports a safe actionable error code", a
   assert.equal(await Asset.countDocuments({ state: "cleanup" }), 1);
 });
 
+test("Cloudinary upload restrictions report a safe, distinct code rather than wrong credentials", async () => {
+  failUpload = "restricted";
+  const result = await imageAsset();
+  assert.equal(result.response.status, 503);
+  assert.equal(result.response.body.code, "IMAGE_HOST_ACCESS_RESTRICTED");
+  assert.doesNotMatch(JSON.stringify(result.response.body), /private provider failure/i);
+});
+
 test("Cloudinary upload failure categories are fixed and do not include untrusted messages", () => {
   const { classifyProviderUploadError } = require("../services/media");
+  assert.equal(classifyProviderUploadError({ http_code: 403, message: "unauthorized" }).code, "IMAGE_HOST_ACCESS_RESTRICTED");
   assert.equal(classifyProviderUploadError({ http_code: 404, message: "private cloud" }).code, "IMAGE_HOST_CLOUD_NOT_FOUND");
   assert.equal(classifyProviderUploadError({ http_code: 429 }).code, "IMAGE_HOST_RATE_LIMITED");
   assert.equal(classifyProviderUploadError({ code: "ENOTFOUND" }).code, "IMAGE_HOST_NETWORK_ERROR");
