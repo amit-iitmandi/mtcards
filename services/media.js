@@ -21,7 +21,12 @@ function classifyProviderUploadError(err) {
   const status = Number(rawStatus);
   const httpStatus = Number.isInteger(status) && status >= 400 && status <= 599 ? status : null;
   const message = String(err?.message || err?.error?.message || '').slice(0, 400);
-  if (httpStatus === 401 || httpStatus === 403 ||
+  // A 403 from Cloudinary's Upload API means a request is forbidden;
+  // it does not prove that the API key/secret are wrong.
+  if (httpStatus === 403) {
+    return { code: 'IMAGE_HOST_ACCESS_RESTRICTED', category: 'access_restricted', httpStatus };
+  }
+  if (httpStatus === 401 ||
       /invalid api key|invalid signature|authentication failed|unauthorized/i.test(message)) {
     return { code: 'IMAGE_HOST_AUTH_FAILED', category: 'authentication', httpStatus };
   }
