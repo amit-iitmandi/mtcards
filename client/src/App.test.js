@@ -52,3 +52,14 @@ test('image gallery supports keyboard closing and restores focus', async () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(trigger).toHaveFocus();
 });
+
+test('catalogue image and title can start a card-specific WhatsApp conversation', () => {
+  process.env.REACT_APP_WHATSAPP_NUMBER = '+91 83530 64406';
+  render(<Post item={card} />);
+  const imageLink = screen.getByRole('link', { name: /MT. 101 के बारे में WhatsApp/ });
+  const url = new URL(imageLink.getAttribute('href'));
+  expect(url.hostname).toBe('wa.me');
+  expect(url.searchParams.get('text')).toContain('MT. 101');
+  expect(url.searchParams.get('text')).toContain('₹12');
+  delete process.env.REACT_APP_WHATSAPP_NUMBER;
+});

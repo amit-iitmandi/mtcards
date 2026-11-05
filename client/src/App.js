@@ -3,6 +3,7 @@ import './storefront.css';
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Switch, Route, Link, Redirect, useLocation } from 'react-router-dom';
 import Home from './component/Home';
+import FeaturedCardsCarousel from './component/FeaturedCardsCarousel';
 import AdminWorkspace from './component/AdminWorkspace';
 import CataloguePage from './component/CataloguePage';
 import EnquiryPage from './component/EnquiryPage';
@@ -58,7 +59,7 @@ function Storefront() {
         <p className="hero-description">कुछ खुशियाँ बताई नहीं जातीं, प्यार से भेजी जाती हैं।<br />अपनी कहानी को दीजिए एक खूबसूरत निमंत्रण —<br className="desktop-break" /> आपकी पसंद का कार्ड, आपके अपनों के नाम।</p>
         <div className="hero-actions"><Link className="primary-action" to="/catalogue">कार्ड संग्रह देखें <span>↗</span></Link><a className="text-action" href="#how-it-works">ऑर्डर कैसे करें <span>→</span></a></div>
         <div className="hero-footnote"><span className="fine-flower" aria-hidden="true">✺</span><p>खाली कार्ड से छपे निमंत्रण तक<small>खुदरा और थोक, दोनों के लिए</small></p></div>
-      </div><InvitationArt /></section>
+      </div><FeaturedCardsCarousel fallback={<InvitationArt />} /></section>
       <div className="service-ribbon" aria-label="उपलब्ध सेवाएँ"><span>शादी के कार्ड</span><i>✦</i><span>हिन्दी प्रिंटिंग</span><i>✦</i><span>खाली कार्ड</span><i>✦</i><span>थोक ऑर्डर</span><i>✦</i><span>आपकी पसंद का डिज़ाइन</span></div>
       <section className="catalogue-section" id="catalogue"><div className="section-heading"><div><p className="eyebrow">आपके शुभ अवसर के लिए</p><h2>हर निमंत्रण, <em>कुछ ख़ास।</em></h2></div><p>अपना पसंदीदा कार्ड चुनें।<br />उपलब्धता और प्रिंटिंग के लिए पूछें।</p></div>
         <div className="catalogue-tools"><div className="category-list" role="group" aria-label="कार्ड की श्रेणी">{categories.map(category => <button key={category.value} className={filter === category.value ? 'selected' : ''} aria-pressed={filter === category.value} onClick={() => setFilter(category.value)}>{category.name}</button>)}</div>
