@@ -15,15 +15,36 @@ const types = {
   "image/png": "png",
   "image/webp": "webp",
 };
+// Provider errors are untrusted. Inspect messages in memory, but emit only fixed codes.
+function authHint(message) {
+  if (/invalid signature|signature (?:is )?(?:invalid|mismatch)/i.test(message)) return 'invalid_signature';
+  if (/invalid api[_ -]?key|unknown api[_ -]?key|api[_ -]?key (?:is )?(?:invalid|unknown)/i.test(message)) return 'invalid_api_key';
+  if (/api[_ -]?secret (?:is )?(?:invalid|mismatch)|api[_ -]?secret mismatch/i.test(message)) return 'secret_mismatch';
+  if (/account (?:is )?(?:disabled|suspended)/i.test(message)) return 'account_disabled';
+  if (/cloud (?:name )?(?:mismatch|not found|unknown)/i.test(message)) return 'cloud_mismatch';
+  return 'unclassified';
+}
+function credentialFormatIssues(env = process.env) {
+  return ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].filter(key => {
+    const value = env[key];
+    return typeof value === 'string' &&
+      (value !== value.trim() || /^['"]|['"]$/.test(value));
+  });
+}
 // Provider errors are untrusted: emit only fixed categories and numeric HTTP status.
 function classifyProviderUploadError(err) {
   const rawStatus = err?.http_code ?? err?.error?.http_code ?? err?.statusCode;
   const status = Number(rawStatus);
   const httpStatus = Number.isInteger(status) && status >= 400 && status <= 599 ? status : null;
   const message = String(err?.message || err?.error?.message || '').slice(0, 400);
-  if (httpStatus === 401 || httpStatus === 403 ||
+  // A 403 from Cloudinary's Upload API means a request is forbidden;
+  // it does not prove that the API key/secret are wrong.
+  if (httpStatus === 403) {
+    return { code: 'IMAGE_HOST_ACCESS_RESTRICTED', category: 'access_restricted', httpStatus };
+  }
+  if (httpStatus === 401 ||
       /invalid api key|invalid signature|authentication failed|unauthorized/i.test(message)) {
-    return { code: 'IMAGE_HOST_AUTH_FAILED', category: 'authentication', httpStatus };
+    return { code: 'IMAGE_HOST_AUTH_FAILED', category: 'authentication', httpStatus, authHint: authHint(message) };
   }
   if (httpStatus === 404 || /cloud not found|invalid cloud name|unknown cloud/i.test(message)) {
     return { code: 'IMAGE_HOST_CLOUD_NOT_FOUND', category: 'cloud', httpStatus };
@@ -46,6 +67,11 @@ function logProviderFailure(result) {
     event: 'media.provider.upload_failed',
     category: result.category,
     providerStatus: result.httpStatus,
+    ...(result.category === 'authentication' ? {
+      authHint: result.authHint || 'unclassified',
+      // Only variable NAMES are logged, never credential contents, lengths or hashes.
+      credentialFormatIssues: credentialFormatIssues(),
+    } : {}),
   }));
 }
 
@@ -310,6 +336,7 @@ module.exports = {
   remove,
   requireProvider,
   classifyProviderUploadError,
+  credentialFormatIssues,
   setTestProvider: (value) => {
     provider = value;
   },

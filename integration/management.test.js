@@ -502,6 +502,23 @@ test("Cloudinary authentication failure reports a safe actionable error code", a
 
 test("Cloudinary upload failure categories are fixed and do not include untrusted messages", () => {
   const { classifyProviderUploadError } = require("../services/media");
+  assert.equal(classifyProviderUploadError({ http_code: 403, message: "unauthorized" }).code, "IMAGE_HOST_ACCESS_RESTRICTED");
+  const signature = classifyProviderUploadError({ http_code: 401, message: 'Invalid Signature: private provider context' });
+  assert.equal(signature.code, 'IMAGE_HOST_AUTH_FAILED');
+  assert.equal(signature.authHint, 'invalid_signature');
+  assert.doesNotMatch(JSON.stringify(signature), /private provider context/);
+  assert.equal(classifyProviderUploadError({ http_code: 401, message: 'Invalid api_key' }).authHint, 'invalid_api_key');
+  assert.equal(classifyProviderUploadError({ http_code: 401, message: 'API secret mismatch' }).authHint, 'secret_mismatch');
+  assert.equal(classifyProviderUploadError({ http_code: 401, message: 'Unexpected error: sensitive details' }).authHint, 'unclassified');
+  const { credentialFormatIssues } = require('../services/media');
+  const sample = { CLOUDINARY_CLOUD_NAME: 'demo', CLOUDINARY_API_KEY: ' "example" ', CLOUDINARY_API_SECRET: 'private-example' };
+  assert.deepEqual(credentialFormatIssues(sample), ['CLOUDINARY_API_KEY']);
+  assert.doesNotMatch(JSON.stringify(credentialFormatIssues(sample)), /private-example|example/);
+  assert.deepEqual(credentialFormatIssues({
+    CLOUDINARY_CLOUD_NAME: 'demo',
+    CLOUDINARY_API_KEY: 'valid',
+    CLOUDINARY_API_SECRET: 'secret'
+  }), []);
   assert.equal(classifyProviderUploadError({ http_code: 404, message: "private cloud" }).code, "IMAGE_HOST_CLOUD_NOT_FOUND");
   assert.equal(classifyProviderUploadError({ http_code: 429 }).code, "IMAGE_HOST_RATE_LIMITED");
   assert.equal(classifyProviderUploadError({ code: "ENOTFOUND" }).code, "IMAGE_HOST_NETWORK_ERROR");
