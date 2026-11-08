@@ -1,6 +1,6 @@
 import Posts from "./Posts";
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { loadCards } from "../utils/catalogue";
 
 const Home = ({ filter, search = "" }) => {
   const [posts, setPosts] = useState([]);
@@ -11,9 +11,7 @@ const Home = ({ filter, search = "" }) => {
     let active = true;
     setLoading(true);
     setError(false);
-    const base = (process.env.REACT_APP_API_BASE_URL || "").replace(/\/$/, "");
-    axios.get(`${base}/allPost`, { timeout: 15000 }).then(({ data }) => {
-      if (!Array.isArray(data)) throw new Error("Invalid catalogue response");
+    loadCards().then(data => {
       if (active) setPosts(data);
     }).catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
