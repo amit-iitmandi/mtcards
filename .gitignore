@@ -4,6 +4,4 @@ node_modules/
 !.env.example
 .vercel/
 client/build/
-
-backups/
-*.enc
+client/dist/
