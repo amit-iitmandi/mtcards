@@ -3,7 +3,7 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const requireLogin = require("../middleware/requireLogin");
 const requireAdmin = require("../middleware/requireAdmin");
-const validatePost = require("../utils/validatePost");
+const cards = require("../services/cards");
 const Post = mongoose.model("Post");
 
 router.post("/createPost", requireAdmin, async (req, res) => {
@@ -12,14 +12,14 @@ router.post("/createPost", requireAdmin, async (req, res) => {
 
 router.get("/allPost", async (req, res) => {
   try {
-    const posts = await Post.find({status:{$ne:"archived"}}).sort({ title: 1 });
-    return res.json(posts);
+    const posts = await Post.find(cards.filter({}, false)).sort({ title: 1 }).limit(500).lean();
+    return res.json(posts.map(post => cards.present(post)));
   } catch (err) {
     return res.status(500).json({ error: "Could not load products" });
   }
 });
 
-router.get("/myPost", requireLogin, async (req, res) => {
+router.get("/myPost", requireAdmin, async (req, res) => {
   try {
     const posts = await Post.find({ postedBy: req.user._id });
     return res.json(posts);

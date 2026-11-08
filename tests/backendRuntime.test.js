@@ -75,12 +75,18 @@ test('mounted API serves catalogue JSON and denies anonymous writes without data
   const Post = mongoose.model('Post');
   const originalFind = Post.find;
   const records = [{ title: 'Existing test card', image: ['https://example.com/card.jpg'] }];
-  Post.find = () => ({ sort: async () => records });
+  Post.find = filter => {
+    assert.deepEqual(filter, { $or: [{ status: 'published' }, { status: { $exists: false } }] });
+    return { sort() { return this; }, limit(value) { assert.equal(value, 500); return this; }, lean: async () => records };
+  };
   t.after(() => { Post.find = originalFind; });
   const url = await serve(t, app);
   const result = await fetch(url + '/allPost');
   assert.equal(result.status, 200);
-  assert.deepEqual(await result.json(), records);
+  const publicRecords = await result.json();
+  assert.equal(publicRecords[0].title, records[0].title);
+  assert.equal(publicRecords[0].sPrice, undefined);
+  assert.equal(publicRecords[0].stock, undefined);
   assert.equal((await fetch(url + '/register')).status, 410);
   assert.equal((await fetch(url + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 403);
   assert.equal((await fetch(url + '/createPost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 401);

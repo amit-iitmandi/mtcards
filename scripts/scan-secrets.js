@@ -6,13 +6,14 @@ const patterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /\bAIza[\w-]{30,}/,
   /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[A-Z0-9]{16})\b/,
-  /^(?:SECRET_OR_KEY|DATABASE_ACCESS|MONGOURI|SENDGRID_API)[ \t]*=[ \t]*["']?[^\s"']+/m,
+  /^(?:SECRET_OR_KEY|SECRET_KEY|API_KEY|API_SECRET|DATABASE_ACCESS|MONGOURI|SENDGRID_API|CLOUDINARY_API_KEY|CLOUDINARY_API_SECRET|RESEND_API_KEY|CLOUDINARY_URL)[ \t]*=[ \t]*["']?[^\s"']+/m,
   /\b(?:api_secret|client_secret|private_key)\s*["']?\s*[:=]\s*["'][^"']{8,}["']/i
 ];
 const git = args => execFileSync('git', args, { maxBuffer: 64 * 1024 * 1024 });
 const history = process.argv.includes('--history');
 let findings = 0;
 const check = (name, data) => {
+  if (/(^|\/)\.env(?:\.|$)/.test(name) && !/\.env\.example$/.test(name)) { console.error('Forbidden tracked environment file: ' + name); findings++; return; }
   if (data.includes(0)) return;
   const value = data.toString('utf8');
   if (patterns.some(pattern => pattern.test(value))) { console.error('Potential secret: ' + name); findings++; }

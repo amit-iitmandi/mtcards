@@ -36,7 +36,7 @@ before(async () => {
         "diagnosticDataCollectionEnabled=false",
       ],
     },
-    binary: { version: "8.0.17" },
+    binary: { version: process.env.MONGOMS_VERSION || "8.0.17" },
   });
   await m.connect(replica.getUri(), { dbName, autoIndex: false });
   assert.match(m.connection.name, /^mtcards_test_/);
@@ -768,4 +768,18 @@ test("missing image credentials fail closed before creating tickets or receiving
       else process.env[key] = previous[i];
     });
   }
+});
+
+// Exercise the compatibility route too: it must never bypass public visibility.
+test("legacy catalogue excludes drafts/archives and strips all private product fields", async () => {
+  const visible = await Post.create({ ...details, title: "published-visible", status: "published", stock: 77, sPrice: "private", imageAssetIds: [new m.Types.ObjectId()] });
+  await Post.create({ ...details, stock: 0, title: "draft-private", status: "draft" });
+  await Post.create({ ...details, stock: 0, title: "archived-private", status: "archived" });
+  const response = await req("/allPost");
+  assert.equal(response.status, 200);
+  const items = response.body;
+  assert.ok(items.some(item => String(item._id) === String(visible._id)));
+  assert.ok(items.every(item => item.status === "published"));
+  for (const item of items) for (const key of ["sPrice", "stock", "imageAssetIds", "postedBy", "__v"]) assert.equal(item[key], undefined);
+  assert.equal((await req("/myPost", { auth: memberToken })).status, 403);
 });
