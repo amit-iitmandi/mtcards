@@ -10,6 +10,7 @@ export default function FeaturedCardsCarousel({ fallback = null }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const cards = posts
     .filter(item => (!item.status || item.status === 'published') && Array.isArray(item.image) && typeof item.image[0] === 'string' && item.image[0].trim())
+    .sort((a,b) => Number(b.featured === true) - Number(a.featured === true))
     .slice(0, 10);
 
   // Keep the wedding photograph in place when no live product images are available.
@@ -19,19 +20,19 @@ export default function FeaturedCardsCarousel({ fallback = null }) {
     const next = (index + cards.length) % cards.length;
     setActiveIndex(next);
     if (track.current && typeof track.current.scrollTo === 'function') {
-      track.current.scrollTo({ left: next * track.current.clientWidth, behavior: 'smooth' });
+      track.current.scrollTo({ left: track.current.children[next].offsetLeft - track.current.children[0].offsetLeft, behavior: 'smooth' });
     }
   };
 
   const onScroll = event => {
     const element = event.currentTarget;
     if (element.clientWidth) {
-      setActiveIndex(Math.min(cards.length - 1, Math.max(0, Math.round(element.scrollLeft / element.clientWidth))));
+      setActiveIndex(Math.min(cards.length - 1, Math.max(0, Math.round(element.scrollLeft / ((element.children[1]?.offsetLeft - element.children[0]?.offsetLeft) || element.clientWidth)))));
     }
   };
 
   return <section className="featured-carousel" aria-label="चुनिंदा शादी के कार्ड">
-    <div className="featured-carousel-heading"><span>OUR CARD COLLECTION</span><strong>कार्ड चुनें, सीधे बात करें</strong></div>
+    <div className="featured-carousel-heading"><span>EXPLORE THE COLLECTION</span><strong>आपके लिए खास डिज़ाइन</strong></div>
     <div className="featured-carousel-track" ref={track} onScroll={onScroll} role="region" aria-roledescription="carousel" aria-label="शादी के कार्ड की तस्वीरें" tabIndex={0}>
       {cards.map((item, index) => {
         const code = cardCode(item);
