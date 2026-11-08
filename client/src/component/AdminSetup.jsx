@@ -28,7 +28,7 @@ export default function AdminSetup() {
       setError(err.response?.status === 400 ? 'सेटअप कोड गलत, समाप्त या पहले इस्तेमाल हो चुका है। पासवर्ड 12 अक्षर या अधिक और अधिकतम 72 UTF-8 बाइट होना चाहिए।' : 'पासवर्ड अभी नहीं बनाया जा सका। कृपया फिर कोशिश करें।');
     } finally { if (active.current) setBusy(false); }
   }
-  return <main className="admin-page"><section className="admin-panel">
+  return <main className="admin-page auth-editorial"><aside className="auth-story" style={{backgroundImage:"linear-gradient(#351d2699,#351d26bb),url(/images/wedding-story-800.webp)"}}><span>YOUR STUDIO STARTS HERE</span><h2>एक नई शुरुआत,<br/><em>आपके अपने अंदाज़ में।</em></h2><p>अपने व्यवस्थापक खाते का पासवर्ड तैयार करें।</p><Link to="/">स्टोर पर वापस जाएँ ↗</Link></aside><section className="admin-panel">
     <p className="eyebrow">सुरक्षित खाता सेटअप</p><h1>अपना पासवर्ड बनाएँ</h1>
     <p>आपको दिया गया एक बार इस्तेमाल होने वाला सेटअप कोड डालें। अपना पासवर्ड केवल यहाँ दर्ज करें।</p>
     <form onSubmit={submit}>

@@ -1,13 +1,14 @@
+import { vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import axios from 'axios';
 import Home from './component/Home';
 import Post from './component/Post';
 import { inquiryUrl } from './utils/inquiry';
-jest.mock('axios');
-const card = { title: '101', sPrice: '12', image: ['https://example.com/card.jpg'], type1: 'Wedding' };
-beforeEach(() => jest.clearAllMocks());
+vi.mock('axios');
+const card = { title: '101', cPrice: '12', image: ['https://example.com/card.jpg'], type1: 'Wedding' };
+beforeEach(() => vi.resetAllMocks());
 test('shows a recoverable Hindi error when Vercel returns HTML instead of catalogue JSON', async () => {
-  axios.get.mockResolvedValueOnce({ data: '<html></html>' }).mockResolvedValueOnce({ data: [card] });
+  axios.get.mockResolvedValueOnce({ data: '<html></html>' }).mockResolvedValueOnce({ data: { items: [card], total: 1 } });
   render(<Home />);
   expect(await screen.findByRole('alert')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'फिर कोशिश करें' }));
@@ -33,7 +34,7 @@ test('inquiry encodes Hindi and product details and rejects unconfigured numbers
 });
 
 test('search filters existing catalogue titles without another request', async () => {
-  axios.get.mockResolvedValue({ data: [card, { ...card, title: '202' }] });
+  axios.get.mockResolvedValue({ data: { items: [card, { ...card, title: '202' }], total: 2 } });
   const { rerender } = render(<Home search="101" />);
   expect(await screen.findByText('MT. 101')).toBeInTheDocument();
   expect(screen.queryByText('MT. 202')).not.toBeInTheDocument();
