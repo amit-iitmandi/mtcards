@@ -1,10 +1,11 @@
+import { vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import axios from 'axios';
 import AdminWorkspace from './AdminWorkspace';
 import CardEditor from './CardEditor';
 import EnquiryPage from './EnquiryPage';
-jest.mock('axios');
+vi.mock('axios');
 const item = {
   _id: 'abc123',
   title: '108',
@@ -24,7 +25,7 @@ const props = {
   }]
 };
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.resetAllMocks();
   sessionStorage.clear();
   sessionStorage.setItem('token', JSON.stringify({
     data: {
@@ -32,11 +33,11 @@ beforeEach(() => {
     }
   }));
   axios.get.mockImplementation(url => Promise.resolve({
-    data: url.endsWith('/admin/session') ? {} : [item, { ...item,
+    data: url.endsWith('/admin/session') ? {} : { total: 2, items: [item, { ...item,
       _id: 'second',
       title: '205',
       stock: 12
-    }]
+    }] }
   }));
 });
 
@@ -122,8 +123,8 @@ test('edit drafts are local only and publishing is disabled', () => {
   expect(axios.post).not.toHaveBeenCalled();
 });
 test('new card signs photos, uploads to the API and saves managed image IDs', async () => {
-  URL.createObjectURL = jest.fn(() => 'blob:card-preview');
-  URL.revokeObjectURL = jest.fn();
+  URL.createObjectURL = vi.fn(() => 'blob:card-preview');
+  URL.revokeObjectURL = vi.fn();
   const assetId = 'b'.repeat(24);
   axios.post.mockResolvedValueOnce({
     data: { uploadUrl: '/admin/uploads?ticketId=' + 'a'.repeat(24) }
@@ -150,7 +151,7 @@ test('new card signs photos, uploads to the API and saves managed image IDs', as
 });
 
 test('invalid photo is rejected before any network request', async () => {
-  URL.createObjectURL = jest.fn(() => 'blob:bad-preview');
+  URL.createObjectURL = vi.fn(() => 'blob:bad-preview');
   const { container } = render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
   const photo = new File(['<svg/>'], 'unsafe.svg', { type: 'image/svg+xml' });
   fireEvent.change(container.querySelector('input[type=file]'), { target: { files: [photo] } });
@@ -159,8 +160,8 @@ test('invalid photo is rejected before any network request', async () => {
 });
 
 test('backend upload outage preserves photo selection and entered details', async () => {
-  URL.createObjectURL = jest.fn(() => 'blob:outage-preview');
-  URL.revokeObjectURL = jest.fn();
+  URL.createObjectURL = vi.fn(() => 'blob:outage-preview');
+  URL.revokeObjectURL = vi.fn();
   axios.post.mockRejectedValueOnce({ response: { status: 503 } });
   const { container } = render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
   fireEvent.change(screen.getByLabelText('Card code'), { target: { value: '250' } });
@@ -176,8 +177,8 @@ test('backend upload outage preserves photo selection and entered details', asyn
 });
 
 test('stock failure cannot create a second card and can safely retry same adjustment', async () => {
-  URL.createObjectURL = jest.fn(() => 'blob:stock-preview');
-  URL.revokeObjectURL = jest.fn();
+  URL.createObjectURL = vi.fn(() => 'blob:stock-preview');
+  URL.revokeObjectURL = vi.fn();
   const assetId = 'b'.repeat(24);
   axios.post.mockResolvedValueOnce({ data: { uploadUrl: '/admin/uploads?ticketId=' + 'a'.repeat(24) } })
     .mockResolvedValueOnce({ data: { assets: [{ id: assetId, url: 'https://res.cloudinary.com/demo/image/upload/card.jpg' }] } })

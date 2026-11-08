@@ -1,8 +1,9 @@
+import { vi } from 'vitest';
 import axios from 'axios';
 import { uploadPhotos, validateImages, uploadErrorText } from './uploadPhotos';
-jest.mock('axios');
+vi.mock('axios');
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => vi.resetAllMocks());
 
 test('invalid file count and unsupported types are blocked without network traffic', () => {
   expect(() => validateImages([])).toThrow('between 1 and 12');

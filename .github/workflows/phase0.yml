@@ -13,7 +13,8 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '20'
+          node-version: '24'
+      - run: node scripts/scan-secrets.js
       - run: npm run test:security
       - run: node --check routes/post.js && node --check middleware/requireLogin.js && node --check middleware/requireAdmin.js
   frontend-build:
@@ -24,12 +25,14 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
         working-directory: client
-      - run: CI=true npm test -- --watchAll=false --runInBand
+      - run: npm audit --audit-level=low
         working-directory: client
-      - run: CI=false NODE_OPTIONS=--openssl-legacy-provider npm run build
+      - run: npm test
+        working-directory: client
+      - run: npm run build
         working-directory: client

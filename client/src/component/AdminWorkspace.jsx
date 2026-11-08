@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Route, Switch, useHistory } from 'react-router-dom';
 import axios from 'axios';
 import { apiUrl } from '../utils/api';
+import { loadCards } from '../utils/catalogue';
+import { adminToken } from '../utils/uploadPhotos';
+import { endSession } from '../utils/session';
 import AdminUpload from './AdminUpload';
 import CardEditor from './CardEditor';
 import './workspace.css';
@@ -40,13 +43,7 @@ function Workspace({
   useEffect(() => {
     let active = true;
     setStatus('loading');
-    axios.get(apiUrl('/allPost'), {
-      timeout: 15000
-    }).then(({
-      data
-    }) => {
-      if (!Array.isArray(data)) throw Error();
-
+    loadCards({ admin: true, token: adminToken() }).then(data => {
       if (active) {
         setCards(data);
         setStatus('ready');
@@ -93,9 +90,12 @@ function Workspace({
     }
   }
 
-  function logout() {
-    sessionStorage.removeItem('token');
-    history.replace('/login');
+  async function logout() {
+    if (busy) return;
+    setBusy(true);
+    try { await endSession(); history.replace('/login'); }
+    catch (error) { setNotice(error.message); }
+    finally { setBusy(false); }
   }
 
   const metrics = <div className="workspace-metrics">{[['Card designs', cards.length, 'in your catalogue'], ['Recorded stock', known.reduce((sum, c) => sum + stockNumber(c.stock), 0).toLocaleString('en-IN'), 'legacy stock units · verify set mapping'], ['Low stock', low.length, '1–20 recorded units'], ['Out of stock', out.length, 'needs your attention']].map(([label, value, hint]) => <article key={label}><span>{label}</span><strong>{status === 'ready' ? value : '—'}</strong><small>{hint}</small></article>)}</div>;
