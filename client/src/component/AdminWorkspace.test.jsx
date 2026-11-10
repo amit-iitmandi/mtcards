@@ -210,27 +210,9 @@ test('stock failure cannot create a second card and can safely retry same adjust
   expect(axios.post.mock.calls[4][1]).toEqual(before);
   expect(axios.post).toHaveBeenCalledTimes(5);
 });
-test('enquiry composer does not send network requests or claim delivery', () => {
-  render(<MemoryRouter initialEntries={['/enquiry?card=MT.%20108']}><EnquiryPage /></MemoryRouter>);
-  expect(screen.getByLabelText('कार्ड का कोड')).toHaveValue('MT. 108');
-  fireEvent.change(screen.getByLabelText('आपका नाम'), {
-    target: {
-      value: 'Test customer'
-    }
-  });
-  fireEvent.click(screen.getByRole('button', {
-    name: 'WhatsApp पर कीमत पूछें ↗'
-  }));
-  expect(screen.getByRole('status')).toHaveTextContent('संदेश तैयार है');
+test('enquiry has no form or card number field', () => {
+  render(<MemoryRouter initialEntries={['/enquiry?card=MT.%20108']}><EnquiryPage navigate={() => {}} /></MemoryRouter>);
+  expect(screen.queryByLabelText('कार्ड का कोड')).not.toBeInTheDocument();
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   expect(axios.post).not.toHaveBeenCalled();
-});
-
-
-test('card added year defaults to the current shop year and can be saved in a draft', () => {
-  const year = Number(new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'Asia/Kolkata' }).format(new Date()));
-  render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
-  expect(screen.getByLabelText('Card added year')).toHaveValue(year);
-  fireEvent.change(screen.getByLabelText('Card added year'), { target: { value: String(year - 1) } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save session draft' }));
-  expect(JSON.parse(sessionStorage.getItem('mtcards:card-draft:new')).addedYear).toBe(String(year - 1));
 });

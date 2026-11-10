@@ -1,3 +1,4 @@
+import { inquiryUrl, whatsappUrl } from '../utils/inquiry';
 import { useEffect, useRef, useState } from 'react';
 const PopupCard = ({ item, setIsOpen }) => {
   const [index, setIndex] = useState(0);
@@ -24,7 +25,7 @@ const PopupCard = ({ item, setIsOpen }) => {
     <div className="card-dialog" role="dialog" aria-modal="true" aria-label={`कार्ड MT. ${item.title}`} tabIndex={-1} ref={dialog}>
       <button className="dialog-close" onClick={() => setIsOpen(false)} aria-label="तस्वीरें बंद करें">×</button>
       <div className="dialog-image">{images.length > 0 && <img src={images[index]} alt={`कार्ड MT. ${item.title}, तस्वीर ${index + 1}`} />}</div>
-      <section className="dialog-card-info"><p className="eyebrow">THE INVITATION DETAILS</p><h2>MT. {item.title}</h2><p>{item.description || "अपने शुभ अवसर के लिए इस निमंत्रण का पूरा रूप देखें।"}</p><dl><div><dt>श्रेणी</dt><dd>{item.type1 || "विवाह निमंत्रण"}</dd></div><div><dt>बनावट</dt><dd>{item.type2 || "जानकारी के लिए पूछें"}</dd></div></dl><a className="primary-action" href={`/enquiry?card=${encodeURIComponent(`MT. ${item.title}`)}`}>इस कार्ड के बारे में पूछें ↗</a></section><div className="dialog-footer"><span>MT. {item.title} · ₹ {item.cPrice}</span>{images.length > 1 && <div><button onClick={() => setIndex(value => (value - 1 + images.length) % images.length)} aria-label="पिछली तस्वीर">←</button><span>{index + 1} / {images.length}</span><button onClick={() => setIndex(value => (value + 1) % images.length)} aria-label="अगली तस्वीर">→</button></div>}</div>
+      <section className="dialog-card-info"><p className="eyebrow">THE INVITATION DETAILS</p><h2>MT. {item.title}</h2><p>{item.description || "अपने शुभ अवसर के लिए इस निमंत्रण का पूरा रूप देखें।"}</p><dl><div><dt>श्रेणी</dt><dd>{item.type1 || "विवाह निमंत्रण"}</dd></div><div><dt>बनावट</dt><dd>{item.type2 || "जानकारी के लिए पूछें"}</dd></div></dl><a className="primary-action" href={inquiryUrl(item)}>इस कार्ड के बारे में पूछें ↗</a></section><div className="dialog-footer"><span>MT. {item.title} · ₹ {item.cPrice}</span>{images.length > 1 && <div><button onClick={() => setIndex(value => (value - 1 + images.length) % images.length)} aria-label="पिछली तस्वीर">←</button><span>{index + 1} / {images.length}</span><button onClick={() => setIndex(value => (value + 1) % images.length)} aria-label="अगली तस्वीर">→</button></div>}</div>
     </div>
   </div>;
 };
