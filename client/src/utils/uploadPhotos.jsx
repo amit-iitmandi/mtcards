@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { apiUrl } from './api';
+import { preparePhotos } from './compressImages';
 
 export const IMAGE_LIMITS = {
   maxFiles: 12,
@@ -29,9 +30,10 @@ export function adminToken() {
   }
 }
 
-export async function uploadPhotos(files, token) {
-  validateImages(files);
+export async function uploadPhotos(originals, token, onProgress) {
   if (!token) throw new Error('Your session expired. Please log in again.');
+  const files = await preparePhotos(originals, onProgress);
+  validateImages(files);
   const auth = { Authorization: token };
   const { data: ticket } = await axios.post(apiUrl('/admin/uploads/sign'), {
     files: files.map(file => ({ mimeType: file.type, size: file.size }))
