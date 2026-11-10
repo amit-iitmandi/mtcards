@@ -26,6 +26,8 @@ New JWTs carry account sessionVersion. Logout increments it; middleware checks i
 
 ## Cards
 
+`addedYear` is the calendar year the card was added (integer, 1900 through the current year). New cards default to the current year in Asia/Kolkata when omitted. POST and PATCH accept it; card responses include it. Legacy records without a saved year return `null` and are not backfilled. PATCH omission preserves the existing value. Example: `{"addedYear":2026}`.
+
 Public: `GET /cards?q=&category=&format=&page=&limit=`, `GET /cards/:id`. Only published, unarchived cards appear. Historical records with no status are treated as published. Public fields: `_id,title,type1,type2,description,cPrice,image,status,version`; never `sPrice`, exact stock or internal asset IDs.
 
 Admin: `GET /admin/cards?q=&category=&format=&status=&page=&limit=`, `GET /admin/cards/:id`; return legacy fields plus `{status,version,imageAssetIds,updatedAt}`. Missing historical version is exposed as zero. Allowed statuses: draft, published, archived.

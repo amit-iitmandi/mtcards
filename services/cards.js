@@ -5,11 +5,13 @@ const Post = m.model("Post"),
   Movement = m.model("StockMovement"),
   Asset = m.model("MediaAsset"),
   Audit = m.model("AuditEvent");
+const { currentCardYear } = require("../utils/cardYear");
 const statusOf = (card) => card.status || "published";
 function present(card, admin = false) {
   const c = {
     _id: card._id,
     title: card.title,
+    addedYear: card.addedYear ?? null,
     type1: card.type1,
     type2: card.type2,
     description: card.description || "",
@@ -53,6 +55,7 @@ const versionMatch = (version) =>
 function fields(body, patch = false) {
   object(body, [
     "title",
+    "addedYear",
     "type1",
     "type2",
     "description",
@@ -63,6 +66,8 @@ function fields(body, patch = false) {
     ...(patch ? ["expectedVersion"] : []),
   ]);
   const result = {};
+  if (body.addedYear !== undefined) result.addedYear = integer(body.addedYear, "addedYear", 1900, currentCardYear());
+  else if (!patch) result.addedYear = currentCardYear();
   for (const [key, max] of [
     ["title", 120],
     ["type1", 100],
