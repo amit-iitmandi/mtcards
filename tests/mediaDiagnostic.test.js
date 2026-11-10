@@ -2,21 +2,27 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { mediaDiagnostic } = require('../utils/mediaDiagnostic');
 
-test('diagnostic identifies the account and masks the key without reading the secret', () => {
-  const env = { CLOUDINARY_CLOUD_NAME: 'example-cloud', CLOUDINARY_API_KEY: '123456789012345' };
-  Object.defineProperty(env, 'CLOUDINARY_API_SECRET', { get() { throw Error('Secret accessed'); } });
-  assert.deepEqual(mediaDiagnostic(env), {
-    event: 'media.provider.configuration', cloudName: 'example-cloud', apiKeyMasked: '****2345',
+test('logs only the requested last four characters of each setting', () => {
+  const env = { CLOUDINARY_CLOUD_NAME: 'example-cloud', CLOUDINARY_API_KEY: '123456789012345', CLOUDINARY_API_SECRET: 'example-private-secret' };
+  const result = mediaDiagnostic(env);
+  assert.deepEqual(result, {
+    event: 'media.provider.configuration', cloudNameMasked: '****loud',
+    apiKeyMasked: '****2345', apiSecretMasked: '****cret',
   });
+  for (const value of Object.values(env)) assert.ok(!JSON.stringify(result).includes(value));
 });
 
-test('unexpected values and short keys are never echoed into logs', () => {
-  for (const value of ['1234', ' secret value ', 'secret\nforged log', 'https://example.com', {}, null]) {
-    const result = mediaDiagnostic({ CLOUDINARY_CLOUD_NAME: value, CLOUDINARY_API_KEY: value });
-    assert.ok(['[missing]', '[invalid format]'].includes(result.apiKeyMasked));
-    if (value !== '1234') assert.ok(['[missing]', '[invalid format]'].includes(result.cloudName));
+test('does not reveal entire short, missing or non-string values', () => {
+  for (const value of [undefined, null, {}, '', 'abcd', '123']) {
+    const result = mediaDiagnostic({ CLOUDINARY_CLOUD_NAME: value, CLOUDINARY_API_KEY: value, CLOUDINARY_API_SECRET: value });
+    for (const key of ['cloudNameMasked', 'apiKeyMasked', 'apiSecretMasked']) {
+      assert.ok(['[missing]', '[too short to reveal]'].includes(result[key]));
+    }
   }
-  assert.deepEqual(mediaDiagnostic({}), {
-    event: 'media.provider.configuration', cloudName: '[missing]', apiKeyMasked: '[missing]',
-  });
+});
+
+test('serialized log safely escapes control characters in suffixes', () => {
+  const line = JSON.stringify(mediaDiagnostic({ CLOUDINARY_API_SECRET: 'prefix\nabc' }));
+  assert.ok(!line.includes('\n'));
+  assert.equal(JSON.parse(line).apiSecretMasked, '****\nabc');
 });
