@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import axios from 'axios';
 import { uploadPhotos, validateImages, uploadErrorText } from './uploadPhotos';
 vi.mock('axios');
+vi.mock('./compressImages', async importOriginal => ({ ...await importOriginal(), preparePhotos: vi.fn(async files => files) }));
 
 beforeEach(() => vi.resetAllMocks());
 
@@ -47,4 +48,18 @@ test('server provider failure codes guide safe troubleshooting without exposing 
   expect(network).toMatch(/could not connect/);
   expect(uploadErrorText({ response: { status: 503, data: { code: 'UNKNOWN' } } }))
     .toMatch(/temporarily unavailable/);
+});
+
+test('upload ticket and multipart describe the compressed bytes, not the originals', async () => {
+  const { preparePhotos } = await import('./compressImages');
+  const compressed = new File(['small'], 'card.webp', { type: 'image/webp' });
+  preparePhotos.mockResolvedValueOnce([compressed]);
+  const original = new File([new Uint8Array(6 * 1024 * 1024)], 'card.png', { type: 'image/png' });
+  axios.post.mockResolvedValueOnce({ data: { uploadUrl: '/admin/uploads?ticketId=' + 'a'.repeat(24) } })
+    .mockResolvedValueOnce({ data: { assets: [{ id: 'b'.repeat(24), url: 'https://res.cloudinary.com/demo/card.webp' }] } });
+  await uploadPhotos([original], 'Bearer token');
+  expect(axios.post.mock.calls[0][1]).toEqual({ files: [{ mimeType: 'image/webp', size: 5 }] });
+  const uploaded = axios.post.mock.calls[1][1].get('files');
+  expect(uploaded.type).toBe('image/webp');
+  expect(uploaded.size).toBe(5);
 });

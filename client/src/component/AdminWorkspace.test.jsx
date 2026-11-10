@@ -6,6 +6,7 @@ import AdminWorkspace from './AdminWorkspace';
 import CardEditor from './CardEditor';
 import EnquiryPage from './EnquiryPage';
 vi.mock('axios');
+vi.mock('../utils/compressImages', async importOriginal => ({ ...await importOriginal(), preparePhotos: vi.fn(async files => files) }));
 const item = {
   _id: 'abc123',
   title: '108',
