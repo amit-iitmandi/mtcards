@@ -19,7 +19,8 @@ export default function CardEditor({
   item,
   editing = false,
   type1 = [],
-  type2 = []
+  type2 = [],
+  onCreated = () => {}
 }) {
   const draftKey = `mtcards:card-draft:${editing ? item?._id || 'missing' : 'new'}`;
   const [form, setForm] = useState(() => {
@@ -35,6 +36,7 @@ export default function CardEditor({
     }
   }),
         [createdCard, setCreatedCard] = useState(null),
+        [completed, setCompleted] = useState(false),
         [pendingStock, setPendingStock] = useState(null),
         [phase, setPhase] = useState(''),
         [message, setMessage] = useState(''),
@@ -64,7 +66,7 @@ export default function CardEditor({
   }
 
   function finishCreate() {
-    sessionStorage.removeItem(draftKey);
+    try { sessionStorage.removeItem(draftKey); } catch { /* Storage failure must not lock a confirmed save. */ }
     files.forEach(entry => URL.revokeObjectURL(entry.url));
     setFiles([]);
     setForm({ ...initial, addedYear: currentCardYear() });
@@ -72,6 +74,8 @@ export default function CardEditor({
     setPendingStock(null);
     setMessage('Card created in the catalogue with its photos and stock.');
     setError('');
+    setCompleted(true);
+    onCreated();
   }
 
   async function recordStock(cardId, request, token) {
@@ -103,6 +107,7 @@ export default function CardEditor({
     if (busy || editing || createdCard) return;
     setError('');
     setMessage('');
+    setCompleted(false);
     const rawFiles = files.map(entry => entry.file);
     try {
       validateSourceImages(rawFiles);
@@ -171,6 +176,7 @@ export default function CardEditor({
     }
   }
 
+  if (completed) return <section className="editor-panel" role="status"><h1>Card added successfully</h1><p>Your card, photos and stock have been saved.</p><Link className="workspace-primary" to="/admin/cards">View card library</Link><button className="workspace-secondary" type="button" onClick={() => { setCompleted(false); setMessage(''); }}>Add another card</button><p>Card created in the catalogue with its photos and stock.</p></section>;
   if (editing && !item) return <div className="workspace-empty"><h1>Card not found</h1><Link to="/admin/cards">Back to library</Link></div>;
   return <><Link className="editor-back" to="/admin/cards">← Back to card library</Link><div className="workspace-heading compact"><div><p>MAKE ROOM FOR SOMETHING BEAUTIFUL</p><h1>{editing ? 'Refine your card' : 'A new invitation'}<span className="heading-dot">.</span></h1><span>{editing ? `Editing MT. ${item.title}` : 'Every celebration starts with a little detail.'}</span></div><button className="workspace-secondary" onClick={draft}>Save session draft</button></div>
  {editing && <p className="workspace-notice">Design preview · editing is available here as a session draft. Publishing changes and stock adjustments will be enabled after backend integration.</p>}

@@ -124,6 +124,8 @@ test('edit drafts are local only and publishing is disabled', () => {
   expect(axios.post).not.toHaveBeenCalled();
 });
 test('new card signs photos, uploads to the API and saves managed image IDs', async () => {
+  const cleanup = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('Storage blocked'); });
+  const onCreated = vi.fn();
   URL.createObjectURL = vi.fn(() => 'blob:card-preview');
   URL.revokeObjectURL = vi.fn();
   const assetId = 'b'.repeat(24);
@@ -132,7 +134,7 @@ test('new card signs photos, uploads to the API and saves managed image IDs', as
   }).mockResolvedValueOnce({
     data: { assets: [{ id: assetId, url: 'https://res.cloudinary.com/demo/image/upload/card.jpg' }] }
   }).mockResolvedValueOnce({ data: { card: item } });
-  const { container } = render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
+  const { container } = render(<MemoryRouter><CardEditor {...props} onCreated={onCreated} /></MemoryRouter>);
   fireEvent.change(screen.getByLabelText('Card code'), { target: { value: '108' } });
   fireEvent.change(screen.getByLabelText('Recorded stock'), { target: { value: '0' } });
   fireEvent.change(screen.getByLabelText('Customer price · ₹'), { target: { value: '20' } });
@@ -149,6 +151,13 @@ test('new card signs photos, uploads to the API and saves managed image IDs', as
     expect.objectContaining({ headers: { Authorization: 'Bearer test' } }));
   expect(axios.post.mock.calls[1][1]).toBeInstanceOf(FormData);
   expect(axios.post).toHaveBeenCalledTimes(3);
+  expect(onCreated).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('link', { name: 'View card library' })).toHaveAttribute('href', '/admin/cards');
+  fireEvent.click(screen.getByRole('button', { name: 'Add another card' }));
+  expect(screen.getByLabelText('Card code')).toHaveValue('');
+  expect(screen.getByRole('button', { name: 'Create card' })).toBeEnabled();
+  expect(axios.post).toHaveBeenCalledTimes(3);
+  cleanup.mockRestore();
 });
 
 test('invalid photo is rejected before any network request', async () => {
