@@ -209,7 +209,7 @@ test('enquiry composer does not send network requests or claim delivery', () => 
     }
   });
   fireEvent.click(screen.getByRole('button', {
-    name: 'संदेश तैयार करें ↗'
+    name: 'WhatsApp पर कीमत पूछें ↗'
   }));
   expect(screen.getByRole('status')).toHaveTextContent('संदेश तैयार है');
   expect(axios.post).not.toHaveBeenCalled();
