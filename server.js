@@ -73,6 +73,7 @@ async function startServer({ database = mongoose, env = process.env, appFactory 
 if (require.main === module) {
   startServer().then(server => {
     console.log("Backend ready on port " + server.address().port);
+    console.log(JSON.stringify(require('./utils/mediaDiagnostic').mediaDiagnostic()));
     let stopping = false;
     const shutdown = () => {
       if (stopping) return;
