@@ -1,15 +1,15 @@
-// Identify the loaded Cloudinary account without logging authentication secrets.
-// Reject unexpected formats so a misplaced secret cannot be echoed as a name.
+// Emit only the explicitly requested four-character suffixes, never full values.
+function maskedSuffix(value) {
+  if (typeof value !== 'string' || !value) return '[missing]';
+  if (value.length <= 4) return '[too short to reveal]';
+  return '****' + value.slice(-4);
+}
 function mediaDiagnostic(env = process.env) {
-  const cloud = env.CLOUDINARY_CLOUD_NAME;
-  const key = env.CLOUDINARY_API_KEY;
   return {
     event: 'media.provider.configuration',
-    cloudName: typeof cloud === 'string' && /^[a-z0-9_-]{1,64}$/.test(cloud)
-      ? cloud : cloud ? '[invalid format]' : '[missing]',
-    apiKeyMasked: typeof key === 'string' && /^\d{5,32}$/.test(key)
-      ? '****' + key.slice(-4) : key ? '[invalid format]' : '[missing]',
+    cloudNameMasked: maskedSuffix(env.CLOUDINARY_CLOUD_NAME),
+    apiKeyMasked: maskedSuffix(env.CLOUDINARY_API_KEY),
+    apiSecretMasked: maskedSuffix(env.CLOUDINARY_API_SECRET),
   };
 }
-
 module.exports = { mediaDiagnostic };
