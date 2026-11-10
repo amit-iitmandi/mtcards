@@ -3,6 +3,7 @@ import './storefront.css';
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Switch, Route, Link, Redirect, useLocation } from 'react-router-dom';
 import Home from './component/Home';
+import FeaturedCardsCarousel from './component/FeaturedCardsCarousel';
 import CardDetails from './component/CardDetails';
 import {ShortlistProvider,ShortlistPage,useShortlist} from './component/Shortlist';
 import './customer.css';
@@ -57,13 +58,7 @@ function Storefront() {
       <a className="header-action" href="/#catalogue">अपना कार्ड चुनें <span>↗</span></a>
     </header>
     <Switch><Route path="/cards/:id"><CardDetails /></Route><Route exact path="/shortlist"><ShortlistPage /></Route><Route exact path="/">
-      <main><section className="shop-hero"><div className="hero-copy"><p className="eyebrow"><span /> MAA TARA CARD PALACE · जखनियाँ</p>
-        <h1>शादी की पहली<br /><em>खूबसूरत झलक।</em></h1>
-        <p className="hero-description">कुछ खुशियाँ बताई नहीं जातीं, प्यार से भेजी जाती हैं।<br />अपनी कहानी को दीजिए एक खूबसूरत निमंत्रण —<br className="desktop-break" /> आपकी पसंद का कार्ड, आपके अपनों के नाम।</p>
-        <div className="hero-actions"><Link className="primary-action" to="/catalogue">कार्ड संग्रह देखें <span>↗</span></Link><a className="text-action" href="#how-it-works">ऑर्डर कैसे करें <span>→</span></a></div>
-        <div className="hero-footnote"><span className="fine-flower" aria-hidden="true">✺</span><p>खाली कार्ड से छपे निमंत्रण तक<small>खुदरा और थोक, दोनों के लिए</small></p></div>
-      </div><InvitationArt /></section>
-      <div className="service-ribbon" aria-label="उपलब्ध सेवाएँ"><span>शादी के कार्ड</span><i>✦</i><span>हिन्दी प्रिंटिंग</span><i>✦</i><span>खाली कार्ड</span><i>✦</i><span>थोक ऑर्डर</span><i>✦</i><span>आपकी पसंद का डिज़ाइन</span></div>
+      <main><FeaturedCardsCarousel /><div className="service-ribbon" aria-label="उपलब्ध सेवाएँ"><span>शादी के कार्ड</span><i>✦</i><span>हिन्दी प्रिंटिंग</span><i>✦</i><span>खाली कार्ड</span><i>✦</i><span>थोक ऑर्डर</span><i>✦</i><span>आपकी पसंद का डिज़ाइन</span></div>
       <section className="catalogue-section" id="catalogue"><div className="section-heading"><div><p className="eyebrow">आपके शुभ अवसर के लिए</p><h2>हर निमंत्रण, <em>कुछ ख़ास।</em></h2></div><p>अपना पसंदीदा कार्ड चुनें।<br />उपलब्धता और प्रिंटिंग के लिए पूछें।</p></div>
         <div className="catalogue-tools"><div className="category-list" role="group" aria-label="कार्ड की श्रेणी">{categories.map(category => <button key={category.value} className={filter === category.value ? 'selected' : ''} aria-pressed={filter === category.value} onClick={() => setFilter(category.value)}>{category.name}</button>)}</div>
           <label className="catalogue-search"><span aria-hidden="true">⌕</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="कार्ड का नाम या कोड खोजें" aria-label="कार्ड खोजें" /></label></div>
