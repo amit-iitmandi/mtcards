@@ -783,3 +783,29 @@ test("legacy catalogue excludes drafts/archives and strips all private product f
   for (const item of items) for (const key of ["sPrice", "stock", "imageAssetIds", "postedBy", "__v"]) assert.equal(item[key], undefined);
   assert.equal((await req("/myPost", { auth: memberToken })).status, 403);
 });
+
+
+test("card added year defaults, persists, validates and preserves unknown legacy years", async () => {
+  const year = require('../utils/cardYear').currentCardYear();
+  const created = await req('/admin/cards', { method: 'POST', body: { ...details, status: 'draft' } });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.card.addedYear, year);
+  assert.equal((await Post.findById(created.body.card._id).lean()).addedYear, year);
+  const explicit = await req('/admin/cards', { method: 'POST', body: { ...details, status: 'draft', addedYear: year - 1 } });
+  assert.equal(explicit.body.card.addedYear, year - 1);
+  const id = created.body.card._id;
+  const updated = await req('/admin/cards/' + id, { method: 'PATCH', body: { expectedVersion: 0, addedYear: year - 2 } });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.card.addedYear, year - 2);
+  const title = await req('/admin/cards/' + id, { method: 'PATCH', body: { expectedVersion: 1, title: 'Year retained' } });
+  assert.equal(title.body.card.addedYear, year - 2);
+  for (const addedYear of [1899, year + 1, 2020.5, '2020', null]) {
+    const invalid = await req('/admin/cards', { method: 'POST', body: { ...details, status: 'draft', addedYear } });
+    assert.equal(invalid.status, 422);
+    assert.ok(invalid.body.fieldErrors.addedYear);
+  }
+  const old = await legacy();
+  const detail = await req('/cards/' + old._id, { auth: null });
+  assert.equal(detail.body.card.addedYear, null);
+  assert.equal((await Post.findById(old._id).lean()).addedYear, undefined);
+});

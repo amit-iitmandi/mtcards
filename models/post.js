@@ -3,6 +3,7 @@ const { ObjectId } = mongoose.Schema.Types;
 
 const postSchema = new mongoose.Schema({
 
+  addedYear: { type: Number, min: 1900, max: 9999 },
   status: { type: String, enum: ["draft", "published", "archived"] },
   version: { type: Number, min: 0 },
   imageAssetIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "MediaAsset" }],
