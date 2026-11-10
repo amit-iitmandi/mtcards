@@ -3,6 +3,9 @@ import './storefront.css';
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Switch, Route, Link, Redirect, useLocation } from 'react-router-dom';
 import Home from './component/Home';
+import CardDetails from './component/CardDetails';
+import {ShortlistProvider,ShortlistPage,useShortlist} from './component/Shortlist';
+import './customer.css';
 import AdminWorkspace from './component/AdminWorkspace';
 import CataloguePage from './component/CataloguePage';
 import EnquiryPage from './component/EnquiryPage';
@@ -38,21 +41,22 @@ function InvitationArt() {
 }
 
 function App() {
-  return <Router><Storefront /></Router>;
+  return <Router><ShortlistProvider><Storefront /></ShortlistProvider></Router>;
 }
 
 function Storefront() {
   const location = useLocation();
+  const {ids}=useShortlist();
   const isAdmin = location.pathname.startsWith("/admin") && location.pathname !== "/admin/setup";
   const [filter, setFilter] = useState('');
   const [search, setSearch] = useState('');
   return <div className={`storefront ${isAdmin ? "workspace-view" : ""}`} lang="hi">
     <div className="announcement">शादी के कार्ड की बिक्री · प्रिंटिंग · थोक ऑर्डर <span>जखनियाँ, गाज़ीपुर</span></div>
     <header className="shop-header"><Link className="shop-brand" to="/" aria-label="माँ तारा कार्ड पैलेस होम"><span className="brand-mark">माँ</span><span><strong>माँ तारा</strong><small>कार्ड पैलेस</small></span></Link>
-      <nav aria-label="मुख्य नेविगेशन"><Link to="/catalogue">कार्ड संग्रह</Link><a href="/#services">हमारी सेवाएँ</a><Link to="/enquiry">पूछताछ करें</Link></nav>
+      <nav aria-label="मुख्य नेविगेशन"><Link to="/catalogue">कार्ड संग्रह</Link><a href="/#services">हमारी सेवाएँ</a><Link to="/enquiry">पूछताछ करें</Link><Link to="/shortlist">♡ पसंद ({ids.length})</Link></nav>
       <a className="header-action" href="/#catalogue">अपना कार्ड चुनें <span>↗</span></a>
     </header>
-    <Switch><Route exact path="/">
+    <Switch><Route path="/cards/:id"><CardDetails /></Route><Route exact path="/shortlist"><ShortlistPage /></Route><Route exact path="/">
       <main><section className="shop-hero"><div className="hero-copy"><p className="eyebrow"><span /> MAA TARA CARD PALACE · जखनियाँ</p>
         <h1>शादी की पहली<br /><em>खूबसूरत झलक।</em></h1>
         <p className="hero-description">कुछ खुशियाँ बताई नहीं जातीं, प्यार से भेजी जाती हैं।<br />अपनी कहानी को दीजिए एक खूबसूरत निमंत्रण —<br className="desktop-break" /> आपकी पसंद का कार्ड, आपके अपनों के नाम।</p>

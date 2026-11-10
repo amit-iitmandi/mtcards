@@ -5,8 +5,8 @@ export default function EnquiryPage() {
   const params = new URLSearchParams(useLocation().search);
   const [form, setForm] = useState({
     name: '',
-    card: params.get('card') || '',
-    quantity: '',
+    card: params.get('card') || params.get('cards') || '',
+    quantity: params.get('quantity') || '',
     date: '',
     message: ''
   });
