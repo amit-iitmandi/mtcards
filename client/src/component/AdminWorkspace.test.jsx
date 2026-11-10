@@ -6,6 +6,7 @@ import AdminWorkspace from './AdminWorkspace';
 import CardEditor from './CardEditor';
 import EnquiryPage from './EnquiryPage';
 vi.mock('axios');
+vi.mock('../utils/compressImages', async importOriginal => ({ ...await importOriginal(), preparePhotos: vi.fn(async files => files) }));
 const item = {
   _id: 'abc123',
   title: '108',
@@ -144,7 +145,7 @@ test('new card signs photos, uploads to the API and saves managed image IDs', as
     files: [{ mimeType: 'image/jpeg', size: photo.size }]
   }, expect.objectContaining({ headers: { Authorization: 'Bearer test' } }));
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/admin/cards'),
-    expect.objectContaining({ title: '108', imageAssetIds: [assetId], status: 'published' }),
+    expect.objectContaining({ title: '108', addedYear: Number(new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'Asia/Kolkata' }).format(new Date())), imageAssetIds: [assetId], status: 'published' }),
     expect.objectContaining({ headers: { Authorization: 'Bearer test' } }));
   expect(axios.post.mock.calls[1][1]).toBeInstanceOf(FormData);
   expect(axios.post).toHaveBeenCalledTimes(3);
@@ -213,4 +214,14 @@ test('enquiry composer does not send network requests or claim delivery', () => 
   }));
   expect(screen.getByRole('status')).toHaveTextContent('संदेश तैयार है');
   expect(axios.post).not.toHaveBeenCalled();
+});
+
+
+test('card added year defaults to the current shop year and can be saved in a draft', () => {
+  const year = Number(new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'Asia/Kolkata' }).format(new Date()));
+  render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
+  expect(screen.getByLabelText('Card added year')).toHaveValue(year);
+  fireEvent.change(screen.getByLabelText('Card added year'), { target: { value: String(year - 1) } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save session draft' }));
+  expect(JSON.parse(sessionStorage.getItem('mtcards:card-draft:new')).addedYear).toBe(String(year - 1));
 });
