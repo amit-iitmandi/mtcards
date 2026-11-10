@@ -1,16 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const mongoose = require("mongoose");
 const requireLogin = require("../middleware/requireLogin");
-const Post = mongoose.model("Post");
-const User = mongoose.model("User");
 
 router.get("/user/:id", requireLogin, (req, res) => {
-  User.findOne({ _id: req.params.id })
-    .select("-password")
-    .then((data) => {
-      res.json(data)
-      // console.log(data)
-    });
+  if (String(req.user._id) !== req.params.id) return res.status(403).json({ error: "Access denied" });
+  const { _id, name, email, date } = req.user;
+  return res.json({ _id, name, email, date });
 });
 module.exports = router;

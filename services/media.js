@@ -1,0 +1,388 @@
+const m = require("mongoose");
+const sharp = require("sharp");
+const cloudinary = require("cloudinary").v2;
+const { randomUUID } = require("crypto");
+const { fail, object, integer, id } = require("../utils/api");
+const Ticket = m.model("UploadTicket"),
+  Asset = m.model("MediaAsset");
+const limits = {
+  maxFiles: 12,
+  maxFileBytes: 5 * 1024 * 1024,
+  maxTotalBytes: 25 * 1024 * 1024,
+};
+const types = {
+  "image/jpeg": "jpeg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+// Provider errors are untrusted. Inspect messages in memory, but emit only fixed codes.
+function authHint(message) {
+  if (/invalid signature|signature (?:is )?(?:invalid|mismatch)/i.test(message)) return 'invalid_signature';
+  if (/invalid api[_ -]?key|unknown api[_ -]?key|api[_ -]?key (?:is )?(?:invalid|unknown)/i.test(message)) return 'invalid_api_key';
+  if (/api[_ -]?secret (?:is )?(?:invalid|mismatch)|api[_ -]?secret mismatch/i.test(message)) return 'secret_mismatch';
+  if (/account (?:is )?(?:disabled|suspended)/i.test(message)) return 'account_disabled';
+  if (/cloud (?:name )?(?:mismatch|not found|unknown)/i.test(message)) return 'cloud_mismatch';
+  return 'unclassified';
+}
+function credentialFormatIssues(env = process.env) {
+  return ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].filter(key => {
+    const value = env[key];
+    return typeof value === 'string' &&
+      (value !== value.trim() || /^['"]|['"]$/.test(value));
+  });
+}
+// Provider errors are untrusted: emit only fixed categories and numeric HTTP status.
+function classifyProviderUploadError(err) {
+  const rawStatus = err?.http_code ?? err?.error?.http_code ?? err?.statusCode;
+  const status = Number(rawStatus);
+  const httpStatus = Number.isInteger(status) && status >= 400 && status <= 599 ? status : null;
+  const message = String(err?.message || err?.error?.message || '').slice(0, 400);
+  // A 403 from Cloudinary's Upload API means a request is forbidden;
+  // it does not prove that the API key/secret are wrong.
+  if (httpStatus === 403) {
+    return { code: 'IMAGE_HOST_ACCESS_RESTRICTED', category: 'access_restricted', httpStatus };
+  }
+  if (httpStatus === 401 ||
+      /invalid api key|invalid signature|authentication failed|unauthorized/i.test(message)) {
+    return { code: 'IMAGE_HOST_AUTH_FAILED', category: 'authentication', httpStatus, authHint: authHint(message) };
+  }
+  if (httpStatus === 404 || /cloud not found|invalid cloud name|unknown cloud/i.test(message)) {
+    return { code: 'IMAGE_HOST_CLOUD_NOT_FOUND', category: 'cloud', httpStatus };
+  }
+  if (httpStatus === 413) {
+    return { code: 'IMAGE_HOST_FILE_REJECTED', category: 'limit', httpStatus };
+  }
+  if (httpStatus === 429) {
+    return { code: 'IMAGE_HOST_RATE_LIMITED', category: 'rate_limit', httpStatus };
+  }
+  if (['ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(err?.code) ||
+      /socket hang up|network timeout/i.test(message)) {
+    return { code: 'IMAGE_HOST_NETWORK_ERROR', category: 'network', httpStatus };
+  }
+  return { code: 'IMAGE_HOST_UPLOAD_FAILED', category: 'unknown', httpStatus };
+}
+function logProviderFailure(result) {
+  // Never log Cloudinary's error message: it can contain account information.
+  console.error(JSON.stringify({
+    event: 'media.provider.upload_failed',
+    category: result.category,
+    providerStatus: result.httpStatus,
+    ...(result.category === 'authentication' ? {
+      authHint: result.authHint || 'unclassified',
+      // Only variable NAMES are logged, never credential contents, lengths or hashes.
+      credentialFormatIssues: credentialFormatIssues(),
+    } : {}),
+  }));
+}
+
+let provider;
+let lastAuthProbeAt = 0;
+
+// This is a read-only Cloudinary Admin API request. It differentiates an
+// invalid cloud/key/secret combination from an Upload-API-specific signature
+// problem without exposing the actual provider response or credentials.
+function classifyAuthProbeError(err) {
+  const raw = err?.http_code ?? err?.error?.http_code ?? err?.statusCode;
+  const code = Number(raw);
+  const providerStatus = Number.isInteger(code) && code >= 400 && code <= 599 ? code : null;
+  return {
+    adminApi: providerStatus === 401 ? 'authentication_failed'
+      : providerStatus === 403 ? 'permission_denied' : 'unavailable',
+    providerStatus,
+  };
+}
+async function probeAuthOnFailure() {
+  // Avoid excessive authenticated Admin API calls during repeated failed uploads.
+  if (Date.now() - lastAuthProbeAt < 10 * 60 * 1000) return;
+  lastAuthProbeAt = Date.now();
+  const active = client();
+  if (typeof active.ping !== 'function') return; // Isolated mocked upload providers.
+  let timeout;
+  try {
+    const result = await Promise.race([
+      Promise.resolve().then(() => active.ping()),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('Admin API probe timed out')), 5000);
+      }),
+    ]);
+    console.error(JSON.stringify({
+      event: 'media.provider.auth_probe',
+      adminApi: result?.status === 'ok' ? 'authenticated' : 'unexpected_response',
+    }));
+  } catch (err) {
+    console.error(JSON.stringify({
+      event: 'media.provider.auth_probe',
+      ...classifyAuthProbeError(err),
+    }));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+function configured() {
+  return !!(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+}
+function client() {
+  if (provider) return provider;
+  if (!configured())
+    fail(503, "DEPENDENCY_UNAVAILABLE", "Image hosting is not configured");
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true,
+  });
+  return {
+    upload: (buffer, publicId) =>
+      new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            public_id: publicId,
+            resource_type: "image",
+            overwrite: false,
+            allowed_formats: ["jpg", "jpeg", "png", "webp"],
+          },
+          (err, result) => (err ? reject(err) : resolve(result)),
+        );
+        stream.end(buffer);
+      }),
+    destroy: (publicId) =>
+      cloudinary.uploader.destroy(publicId, {
+        resource_type: "image",
+        invalidate: true,
+      }),
+    ping: () => cloudinary.api.ping(),
+  };
+}
+function requireProvider() {
+  client();
+}
+async function ticket(body, owner) {
+  requireProvider();
+  object(body, ["files"]);
+  if (
+    !Array.isArray(body.files) ||
+    !body.files.length ||
+    body.files.length > limits.maxFiles
+  )
+    fail(422, "INVALID_INPUT", "Choose 1–12 image files");
+  let total = 0;
+  for (const file of body.files) {
+    object(file, ["mimeType", "size"]);
+    if (!types[file.mimeType])
+      fail(415, "UNSUPPORTED_MEDIA", "JPEG, PNG and WebP only");
+    integer(file.size, "size", 1, limits.maxFileBytes);
+    total += file.size;
+  }
+  if (total > limits.maxTotalBytes)
+    fail(413, "PAYLOAD_TOO_LARGE", "Images exceed total byte limit");
+  const record = await Ticket.create({
+    owner,
+    files: body.files,
+    expiresAt: new Date(Date.now() + 600000),
+  });
+  return {
+    ticketId: record._id,
+    uploadUrl: "/admin/uploads?ticketId=" + record._id,
+    expiresAt: record.expiresAt,
+    limits,
+  };
+}
+async function validate(files, declarations) {
+  if (
+    !Array.isArray(files) ||
+    !files.length ||
+    files.length !== declarations.length
+  )
+    fail(422, "INVALID_INPUT", "Image count differs from ticket");
+  let total = 0;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i],
+      declared = declarations[i];
+    total += file.size;
+    if (
+      file.size !== declared.size ||
+      file.size > limits.maxFileBytes ||
+      !types[file.mimetype] ||
+      file.mimetype !== declared.mimeType
+    )
+      fail(415, "UNSUPPORTED_MEDIA", "Image size or declared type mismatch");
+    let meta;
+    try {
+      meta = await sharp(file.buffer, {
+        limitInputPixels: 40000000,
+        animated: false,
+      }).metadata();
+      await sharp(file.buffer, { limitInputPixels: 40000000 }).stats();
+    } catch {
+      fail(415, "UNSUPPORTED_MEDIA", "Invalid image content");
+    }
+    if (
+      meta.format !== types[file.mimetype] ||
+      !meta.width ||
+      !meta.height ||
+      meta.width * meta.height > 40000000 ||
+      (meta.pages || 1) > 1
+    )
+      fail(415, "UNSUPPORTED_MEDIA", "Invalid image content or dimensions");
+    file.metadata = meta;
+  }
+  if (total > limits.maxTotalBytes)
+    fail(413, "PAYLOAD_TOO_LARGE", "Images exceed total byte limit");
+}
+async function upload(ticketId, files, owner) {
+  id(ticketId);
+  const pending = await Ticket.findOne({
+    _id: ticketId,
+    owner,
+    state: "pending",
+    expiresAt: { $gt: new Date() },
+  }).lean();
+  if (!pending)
+    fail(
+      409,
+      "UPLOAD_TICKET_INVALID",
+      "Upload ticket expired, used or belongs to another account",
+    );
+  await validate(files, pending.files);
+  const claim = await Ticket.findOneAndUpdate(
+    { _id: ticketId, owner, state: "pending", expiresAt: { $gt: new Date() } },
+    { $set: { state: "processing" } },
+  );
+  if (!claim) fail(409, "UPLOAD_TICKET_INVALID", "Upload ticket already used");
+  const assets = [];
+  let providerFailure = null;
+  try {
+    for (const file of files) {
+      const publicId = "mtcards/" + randomUUID();
+      let result;
+      try {
+        result = await client().upload(file.buffer, publicId);
+      } catch (err) {
+        providerFailure = classifyProviderUploadError(err);
+        logProviderFailure(providerFailure);
+        if (providerFailure.httpStatus === 401) await probeAuthOnFailure();
+        await Asset.create({ owner, publicId, state: "cleanup" });
+        throw err;
+      }
+      try {
+        const url = new URL(result.secure_url);
+        if (
+          url.protocol !== "https:" ||
+          url.hostname !== "res.cloudinary.com" ||
+          result.public_id !== publicId
+        )
+          throw Error("Unexpected provider response");
+      } catch (err) {
+        providerFailure = { code: 'IMAGE_HOST_UPLOAD_FAILED', category: 'invalid_response', httpStatus: null };
+        logProviderFailure(providerFailure);
+        await Asset.create({ owner, publicId, state: "cleanup" });
+        throw err;
+      }
+      let asset;
+      try {
+        asset = await Asset.create({
+          owner,
+          publicId: result.public_id,
+          url: result.secure_url,
+          mimeType: file.mimetype,
+          bytes: file.size,
+          width: file.metadata.width,
+          height: file.metadata.height,
+          state: "ready",
+        });
+      } catch (err) {
+        try {
+          await client().destroy(publicId);
+        } catch {
+          await Asset.create({ owner, publicId, state: "cleanup" });
+        }
+        throw err;
+      }
+      assets.push(asset);
+    }
+    await Ticket.updateOne({ _id: ticketId }, { $set: { state: "complete" } });
+    return assets.map((a) => ({
+      id: a._id,
+      url: a.url,
+      mimeType: a.mimeType,
+      bytes: a.bytes,
+      width: a.width,
+      height: a.height,
+    }));
+  } catch (err) {
+    for (const asset of assets) {
+      try {
+        const result = await client().destroy(asset.publicId);
+        if (!["ok", "not found"].includes(result.result))
+          throw Error("Cleanup failed");
+        await Asset.deleteOne({ _id: asset._id });
+      } catch {
+        await Asset.updateOne(
+          { _id: asset._id },
+          { $set: { state: "cleanup" } },
+        );
+      }
+    }
+    await Ticket.updateOne({ _id: ticketId }, { $set: { state: "failed" } });
+    fail(
+      503,
+      providerFailure?.code || "DEPENDENCY_UNAVAILABLE",
+      "Image upload failed; cleanup is recorded",
+    );
+  }
+}
+async function remove(assetId, owner) {
+  id(assetId);
+  let asset;
+  await m.connection.transaction(async (session) => {
+    asset = await Asset.findOne({ _id: assetId, owner }).session(session);
+    if (!asset) fail(404, "NOT_FOUND", "Asset not found");
+    if (
+      asset.cardId ||
+      asset.state === "attached" ||
+      (await m
+        .model("Post")
+        .exists({ imageAssetIds: assetId })
+        .session(session))
+    )
+      fail(409, "ASSET_IN_USE", "Detach the image from its card first");
+    asset = await Asset.findOneAndUpdate(
+      { _id: assetId, owner, state: { $in: ["ready", "cleanup", "deleting"] } },
+      { $set: { state: "deleting" } },
+      { session, new: true },
+    );
+    if (!asset) fail(409, "ASSET_IN_USE", "Asset is unavailable");
+  });
+  try {
+    const result = await client().destroy(asset.publicId);
+    if (!["ok", "not found"].includes(result.result))
+      throw Error("Delete rejected");
+    await Asset.deleteOne({ _id: assetId, state: "deleting" });
+  } catch {
+    fail(
+      503,
+      "DEPENDENCY_UNAVAILABLE",
+      "Provider deletion failed; retry is safe",
+    );
+  }
+  return { success: true };
+}
+// Explicit injection for isolated provider tests; never driven by HTTP or environment input.
+module.exports = {
+  limits,
+  ticket,
+  upload,
+  validate,
+  remove,
+  requireProvider,
+  classifyProviderUploadError,
+  classifyAuthProbeError,
+  credentialFormatIssues,
+  setTestProvider: (value) => {
+    provider = value;
+  },
+};
