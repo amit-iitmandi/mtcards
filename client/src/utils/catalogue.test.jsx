@@ -15,3 +15,23 @@ test('management list uses the authenticated administrator projection', async ()
   await loadCards({ admin: true, token: 'Bearer fixture' });
   expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('/admin/cards?'), { timeout: 15000, headers: { Authorization: 'Bearer fixture' } });
 });
+
+test('the first catalogue load shares the startup request and waits through a Render loading page', async () => {
+  vi.stubEnv('REACT_APP_API_BASE_URL', 'https://example.onrender.com');
+  vi.useFakeTimers();
+  try {
+    const { warmCatalogue } = await import('./catalogue');
+    axios.get.mockResolvedValueOnce({ data: '<html>Starting</html>' })
+      .mockResolvedValueOnce({ data: { items: [{ _id: 'one' }], total: 1 } });
+    const startup = warmCatalogue();
+    const catalogue = loadCards();
+    expect(axios.get).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(3000);
+    await startup;
+    expect(await catalogue).toEqual([{ _id: 'one' }]);
+    expect(axios.get).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  }
+});

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Redirect, Link, useHistory } from 'react-router-dom';
 import axios from 'axios';
 import { apiUrl } from '../utils/api';
+import { waitForCatalogueStartup } from '../utils/catalogue';
 import CreatePost from './CreatePost';
 import './admin.css';
 import { endSession } from '../utils/session';
@@ -15,7 +16,9 @@ export default function AdminUpload(props) {
     const token = storedToken();
     if (typeof token !== 'string' || !token.startsWith('Bearer ')) { setState('login'); return; }
     setState('checking');
-    axios.get(apiUrl('/admin/session'), { headers: { Authorization: token }, timeout: 15000 })
+    const checkSession = () => active && axios.get(apiUrl('/admin/session'), { headers: { Authorization: token }, timeout: 15000 });
+    const startup = waitForCatalogueStartup();
+    (startup ? startup.then(checkSession) : checkSession())
       .then(() => { if (active) setState('ready'); })
       .catch(err => {
         if (!active) return;

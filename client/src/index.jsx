@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom";
 import "./index.css";
 import App from "./App";
+import { warmCatalogue } from "./utils/catalogue";
 import reportWebVitals from "./reportWebVitals";
 import 'bootstrap/dist/css/bootstrap.css';
 import '../node_modules/bootstrap/dist/css/bootstrap.min.css';
@@ -11,6 +12,12 @@ import './fonts/Ruda-ExtraBold.ttf';
 import './fonts/Ruda-Medium.ttf';
 import './fonts/Ruda-Regular.ttf';
 import './fonts/Ruda-SemiBold.ttf';
+
+try {
+  warmCatalogue();
+} catch {
+  // Let the catalogue show its normal configuration error.
+}
 
 ReactDOM.render(
   <React.StrictMode>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useHistory, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { apiUrl } from '../utils/api';
+import { waitForCatalogueStartup } from '../utils/catalogue';
 import './admin.css';
 
 export default function Login() {
@@ -18,6 +19,8 @@ export default function Login() {
     if (busy) return;
     setBusy(true); setError('');
     try {
+      await waitForCatalogueStartup();
+      if (!active.current) return;
       const { data } = await axios.post(apiUrl('/login'), { email: email.trim().toLowerCase(), userPass: password }, { timeout: 15000 });
       if (!data || typeof data.token !== 'string' || !data.token.startsWith('Bearer ')) throw new Error('Invalid session');
       await axios.get(apiUrl('/admin/session'), { headers: { Authorization: data.token }, timeout: 15000 });
