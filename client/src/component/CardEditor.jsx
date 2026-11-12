@@ -4,6 +4,7 @@ import axios from 'axios';
 import { apiUrl } from '../utils/api';
 import { adminToken, uploadPhotos, releasePhotos, uploadErrorText } from '../utils/uploadPhotos';
 import { validateSourceImages } from '../utils/compressImages';
+import PhotoCrop from './PhotoCrop';
 import { currentCardYear } from '../utils/cardYear';
 const initial = {
   title: '',
@@ -42,12 +43,37 @@ export default function CardEditor({
         [message, setMessage] = useState(''),
         [error, setError] = useState(''),
         [busy, setBusy] = useState(false),
-        [files, setFiles] = useState([]);
+        [files, setFiles] = useState([]),
+        [cropIndex, setCropIndex] = useState(null);
+  const photosLocked = busy || !!createdCard || editing;
   const previews = useRef([]);
   useEffect(() => {
     previews.current = files;
   }, [files]);
   useEffect(() => () => previews.current.forEach(f => URL.revokeObjectURL(f.url)), []);
+
+  function addPhotos(event) {
+    const selected = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!selected.length || photosLocked) return;
+    try {
+      validateSourceImages([...files.map(entry => entry.file), ...selected]);
+      const entries = selected.map(file => ({ file, name: file.name, url: URL.createObjectURL(file) }));
+      setFiles([...files, ...entries]);
+      setError('');
+      if (event.target.hasAttribute('capture')) setCropIndex(files.length);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function applyPhotoCrop(file) {
+    validateSourceImages(files.map((entry, index) => index === cropIndex ? file : entry.file));
+    const next = { file, name: file.name, url: URL.createObjectURL(file) };
+    URL.revokeObjectURL(files[cropIndex].url);
+    setFiles(files.map((entry, index) => index === cropIndex ? next : entry));
+    setCropIndex(null);
+  }
 
   function field(key, value) {
     setForm(v => ({ ...v,
@@ -104,7 +130,7 @@ export default function CardEditor({
 
   async function publish(e) {
     e.preventDefault();
-    if (busy || editing || createdCard) return;
+    if (busy || editing || createdCard || cropIndex !== null) return;
     setError('');
     setMessage('');
     setCompleted(false);
@@ -182,26 +208,16 @@ export default function CardEditor({
  {editing && <p className="workspace-notice">Design preview · editing is available here as a session draft. Publishing changes and stock adjustments will be enabled after backend integration.</p>}
  {message && <p className="workspace-notice" role="status">{message}</p>}{phase && <p className="workspace-notice" role="status">{phase}</p>}{error && <p className="workspace-error" role="alert">{error}</p>}{pendingStock && <div className="workspace-notice"><button className="workspace-primary" type="button" disabled={busy} onClick={retryStock}>Retry stock update</button> <Link to="/admin/cards">View saved card in library</Link></div>}
  <form className="editor-layout" onSubmit={publish}><div className="editor-fields"><section className="editor-panel"><div className="editor-panel-title"><span>01</span><div><h2>The essentials</h2><p>A clear identity for your card.</p></div></div><div className="editor-form-grid"><label>Card code<input required maxLength={50} value={form.title} onChange={e => field('title', e.target.value)} placeholder="e.g. 108" /></label><label>Card added year<input type="number" required min="1900" max={currentCardYear()} step="1" value={form.addedYear ?? ''} onChange={e => field('addedYear', e.target.value)} /></label><label>Category<select value={form.type1} onChange={e => field('type1', e.target.value)}>{type1.map(t => <option key={t.name}>{t.name}</option>)}</select></label><label>Card format<select value={form.type2} onChange={e => field('type2', e.target.value)}>{type2.map(t => <option key={t.name}>{t.name}</option>)}</select></label><label>Recorded stock<input aria-label="Recorded stock" type="number" required min="0" step="1" value={form.stock} onChange={e => field('stock', e.target.value)} /><small>Existing units. Sets and envelope counts need inventory integration.</small></label><label>Customer price · ₹<input type="number" min="0" required step="0.01" value={form.cPrice} onChange={e => field('cPrice', e.target.value)} /></label><label>Selling price · ₹<input type="number" min="0" required step="0.01" value={form.sPrice} onChange={e => field('sPrice', e.target.value)} /></label><label className="full-width">Description<textarea rows={4} maxLength={2000} value={form.description} onChange={e => field('description', e.target.value)} placeholder="Paper finish, colours, printing details…" /></label></div></section>
- <section className="editor-panel"><div className="editor-panel-title"><span>02</span><div><h2>Let the details shine</h2><p>Choose bright, clear photographs of your invitation.</p></div></div><label className="editor-dropzone"><span>↑</span><strong>Choose photos to upload</strong><small>JPG, PNG or WebP · up to 12 photos, 20 MB each before compression</small><input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || !!createdCard || editing} onChange={e => {
-              const selected = Array.from(e.target.files || []);
-              e.target.value = '';
-              if (!selected.length) return;
-              try {
-                validateSourceImages(selected);
-              } catch (err) {
-                setError(err.message);
-                return;
-              }
-              files.forEach(entry => URL.revokeObjectURL(entry.url));
-              setFiles(selected.map(file => ({
-                url: URL.createObjectURL(file),
-                name: file.name,
-                file
-              })));
-              setError('');
-            }} /></label><p className="editor-help">Photos are automatically compressed on your device before secure upload. Large photos are resized to 2,400 pixels; your original files stay unchanged. Only you and authorized shop administrators can publish.</p><div className="editor-thumbnails">{(form.image || []).map((url, i) => <div key={`${url}-${i}`}><img src={url} alt={`Invitation detail ${i + 1}`} /><button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => field('image', form.image.filter((_, n) => n !== i))}>×</button></div>)}{files.map((f, i) => <div key={f.url}><img src={f.url} alt={f.name} /><button type="button" disabled={busy || !!createdCard} aria-label={`Remove local preview ${i + 1}`} onClick={() => {
+ <section className="editor-panel"><div className="editor-panel-title"><span>02</span><div><h2>Let the details shine</h2><p>Choose bright, clear photographs of your invitation.</p></div></div><div className="editor-photo-actions">
+   <label className="editor-dropzone"><span>↑</span><strong>Choose photos to upload</strong><small>JPG, PNG or WebP · up to 12 photos, 20 MB each</small>
+     <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={photosLocked} onChange={addPhotos} />
+   </label>
+   <label className="workspace-secondary editor-camera">Take a photo
+     <input type="file" aria-label="Take a photo" accept="image/jpeg,image/png,image/webp" capture="environment" disabled={photosLocked} onChange={addPhotos} />
+   </label>
+ </div><p className="editor-help">Photos are automatically compressed on your device before secure upload. Use Crop under any photo to trim it before upload. Large photos are resized to 2,400 pixels.</p><div className="editor-thumbnails">{(form.image || []).map((url, i) => <div key={`${url}-${i}`}><img src={url} alt={`Invitation detail ${i + 1}`} /><button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => field('image', form.image.filter((_, n) => n !== i))}>×</button></div>)}{files.map((f, i) => <div className="editor-photo-item" key={f.url}><div><img src={f.url} alt={f.name} /><button type="button" disabled={busy || !!createdCard} aria-label={`Remove local preview ${i + 1}`} onClick={() => {
                 URL.revokeObjectURL(f.url);
                 setFiles(v => v.filter((_, n) => n !== i));
-              }}>×</button></div>)}</div></section><div className="editor-savebar"><span>{editing ? 'Session draft only' : 'Review your details before creating the card.'}</span><button className="workspace-primary" type="submit" disabled={editing || busy || !!createdCard}>{busy ? 'Creating…' : editing ? 'Publish changes · pending' : createdCard ? 'Card saved · stock pending' : 'Create card'}</button></div></div>
- <aside className="editor-preview"><p>STOREFRONT PREVIEW</p><div className="preview-card"><div className="preview-image">{form.image?.[0] || files[0]?.url ? <img src={form.image?.[0] || files[0]?.url} alt="Invitation preview" /> : <span>शुभ<br />आमंत्रण</span>}</div><div><small>{form.type1}</small><h3>MT. {form.title || 'Your card code'}</h3><strong>₹ {form.sPrice || '—'} <small>/ card</small></strong><p>{form.description || 'Your invitation, beautifully presented.'}</p></div></div><div className="preview-tip"><span>✺</span><p>A lovely first impression starts with a clear photo. Keep the background simple and the whole card visible.</p></div></aside></form></>;
+              }}>×</button></div><button type="button" className="workspace-secondary editor-photo-crop-button" disabled={photosLocked} aria-label={`Crop photo ${i + 1}`} onClick={() => setCropIndex(i)}>Crop</button></div>)}</div></section><div className="editor-savebar"><span>{editing ? 'Session draft only' : 'Review your details before creating the card.'}</span><button className="workspace-primary" type="submit" disabled={editing || busy || !!createdCard}>{busy ? 'Creating…' : editing ? 'Publish changes · pending' : createdCard ? 'Card saved · stock pending' : 'Create card'}</button></div></div>
+ <aside className="editor-preview"><p>STOREFRONT PREVIEW</p><div className="preview-card"><div className="preview-image">{form.image?.[0] || files[0]?.url ? <img src={form.image?.[0] || files[0]?.url} alt="Invitation preview" /> : <span>शुभ<br />आमंत्रण</span>}</div><div><small>{form.type1}</small><h3>MT. {form.title || 'Your card code'}</h3><strong>₹ {form.sPrice || '—'} <small>/ card</small></strong><p>{form.description || 'Your invitation, beautifully presented.'}</p></div></div><div className="preview-tip"><span>✺</span><p>A lovely first impression starts with a clear photo. Keep the background simple and the whole card visible.</p></div></aside></form>{cropIndex !== null && files[cropIndex] && <PhotoCrop photo={files[cropIndex]} onCancel={() => setCropIndex(null)} onApply={applyPhotoCrop} />}</>;
 }

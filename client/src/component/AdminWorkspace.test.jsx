@@ -216,3 +216,33 @@ test('enquiry has no form or card number field', () => {
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   expect(axios.post).not.toHaveBeenCalled();
 });
+
+test('camera photos can be cropped at a free aspect ratio before upload', async () => {
+  URL.createObjectURL = vi.fn(file => 'blob:' + file.name + ':' + file.size);
+  URL.revokeObjectURL = vi.fn();
+  const drawImage = vi.fn();
+  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage });
+  const encode = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => {
+    callback(new Blob(['cropped jpeg'], { type: 'image/jpeg' }));
+  });
+  try {
+    render(<MemoryRouter><CardEditor {...props} /></MemoryRouter>);
+    const camera = screen.getByLabelText('Take a photo');
+    expect(camera).toHaveAttribute('capture', 'environment');
+    const file = new File(['original'], 'camera.jpg', { type: 'image/jpeg' });
+    fireEvent.change(camera, { target: { files: [file] } });
+    const dialog = screen.getByRole('dialog', { name: 'Crop photo' });
+    const photo = dialog.querySelector('img');
+    Object.defineProperties(photo, { naturalWidth: { value: 1000 }, naturalHeight: { value: 800 } });
+    fireEvent.load(photo);
+    fireEvent.change(screen.getByLabelText('left crop edge'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('bottom crop edge'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply crop' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(drawImage).toHaveBeenCalledWith(photo, 100, 0, 900, 400, 0, 0, 900, 400);
+    expect(screen.getByAltText('Invitation preview')).toHaveAttribute('src', 'blob:camera.jpg:12');
+  } finally {
+    context.mockRestore();
+    encode.mockRestore();
+  }
+});
