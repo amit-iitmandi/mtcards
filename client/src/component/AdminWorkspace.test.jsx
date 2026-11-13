@@ -63,16 +63,16 @@ test('stock filters and search use catalogue data without refetching', async () 
   expect(screen.getByText('No cards found')).toBeInTheDocument();
   expect(axios.get).toHaveBeenCalledTimes(2);
 });
-test('delete waits for confirmation and successful server response', async () => {
+test('archive waits for confirmation and stays hidden after the library reloads', async () => {
   axios.delete.mockResolvedValue({
     data: {
-      success: true
+      success: true, archived: true
     }
   });
-  workspace();
+  const view = workspace();
   await screen.findByText('MT. 108');
   fireEvent.click(screen.getAllByRole('button', {
-    name: 'Delete'
+    name: 'Archive'
   })[0]);
   expect(axios.delete).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', {
@@ -80,10 +80,10 @@ test('delete waits for confirmation and successful server response', async () =>
   }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   fireEvent.click(screen.getAllByRole('button', {
-    name: 'Delete'
+    name: 'Archive'
   })[0]);
   fireEvent.click(screen.getByRole('button', {
-    name: 'Delete permanently'
+    name: 'Archive card'
   }));
   await waitFor(() => expect(screen.queryByText('MT. 108')).not.toBeInTheDocument());
   expect(axios.delete).toHaveBeenCalledWith(expect.stringContaining('/deletePost/abc123'), {
@@ -92,18 +92,28 @@ test('delete waits for confirmation and successful server response', async () =>
     },
     timeout: 15000
   });
+  view.unmount();
+  axios.get.mockImplementation(async url => ({
+    data: url.endsWith('/admin/session') ? {} : {
+      total: 2,
+      items: [{ ...item, status: 'archived' }, { ...item, _id: 'second', title: '205', status: 'draft' }]
+    }
+  }));
+  workspace();
+  await screen.findByText('MT. 205');
+  expect(screen.queryByText('MT. 108')).not.toBeInTheDocument();
 });
-test('failed deletion keeps card and shows retryable error', async () => {
+test('failed archive keeps card and shows retryable error', async () => {
   axios.delete.mockRejectedValue(new Error('offline'));
   workspace();
   await screen.findByText('MT. 108');
   fireEvent.click(screen.getAllByRole('button', {
-    name: 'Delete'
+    name: 'Archive'
   })[0]);
   fireEvent.click(screen.getByRole('button', {
-    name: 'Delete permanently'
+    name: 'Archive card'
   }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('could not be deleted');
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be archived');
   expect(screen.getByText('MT. 108')).toBeInTheDocument();
 });
 test('edit drafts are local only and publishing is disabled', () => {
