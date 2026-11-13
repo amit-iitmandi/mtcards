@@ -2,16 +2,37 @@ import { useEffect, useRef, useState } from 'react';
 import './photoCrop.css';
 
 const fullPhoto = { left: 0, top: 0, right: 1, bottom: 1 };
+function rotateSelection({ left, top, right, bottom }, rotation) {
+  switch (rotation) {
+    case 90: return { left: 1 - bottom, top: left, right: 1 - top, bottom: right };
+    case 180: return { left: 1 - right, top: 1 - bottom, right: 1 - left, bottom: 1 - top };
+    case 270: return { left: top, top: 1 - right, right: bottom, bottom: 1 - left };
+    default: return { left, top, right, bottom };
+  }
+}
+
 const edges = ['left', 'top', 'right', 'bottom'];
 
 export default function PhotoCrop({ photo, onCancel, onApply }) {
   const dialog = useRef(null);
   const image = useRef(null);
   const start = useRef(null);
+  const stage = useRef(null);
+  const [rotation, setRotation] = useState(0);
   const [crop, setCrop] = useState(fullPhoto);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const sideways = rotation % 180 !== 0;
+  const sourceRatio = ready ? image.current.naturalWidth / image.current.naturalHeight : 1;
+  const previewRatio = sideways ? 1 / sourceRatio : sourceRatio;
+
+  function rotate(direction) {
+    start.current = null;
+    setRotation((rotation + direction + 360) % 360);
+    // Keep the selected part of the photo as it turns.
+    if (crop !== fullPhoto) setCrop(rotateSelection(crop, direction === 90 ? 90 : 270));
+  }
 
   useEffect(() => {
     const element = dialog.current;
@@ -23,7 +44,7 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
   }, []);
 
   function point(event) {
-    const bounds = image.current.getBoundingClientRect();
+    const bounds = stage.current.getBoundingClientRect();
     const clamp = value => Math.min(1, Math.max(0, value));
     return {
       x: clamp((event.clientX - bounds.left) / bounds.width),
@@ -43,23 +64,31 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
   }
 
   async function applyCrop() {
-    if (crop === fullPhoto) { onCancel(); return; }
+    if (crop === fullPhoto && rotation === 0) { onCancel(); return; }
     setSaving(true);
     setError('');
     const source = image.current;
     const canvas = document.createElement('canvas');
     try {
-      const x = Math.min(source.naturalWidth - 1, Math.round(crop.left * source.naturalWidth));
-      const y = Math.min(source.naturalHeight - 1, Math.round(crop.top * source.naturalHeight));
-      const width = Math.max(1, Math.round(crop.right * source.naturalWidth) - x);
-      const height = Math.max(1, Math.round(crop.bottom * source.naturalHeight) - y);
+      const selection = rotateSelection(crop, (360 - rotation) % 360);
+      const x = Math.min(source.naturalWidth - 1, Math.round(selection.left * source.naturalWidth));
+      const y = Math.min(source.naturalHeight - 1, Math.round(selection.top * source.naturalHeight));
+      const width = Math.max(1, Math.round(selection.right * source.naturalWidth) - x);
+      const height = Math.max(1, Math.round(selection.bottom * source.naturalHeight) - y);
       const scale = Math.min(1, 2400 / Math.max(width, height));
-      canvas.width = Math.max(1, Math.round(width * scale));
-      canvas.height = Math.max(1, Math.round(height * scale));
+      const outputWidth = Math.max(1, Math.round(width * scale));
+      const outputHeight = Math.max(1, Math.round(height * scale));
+      canvas.width = sideways ? outputHeight : outputWidth;
+      canvas.height = sideways ? outputWidth : outputHeight;
       const context = canvas.getContext('2d');
       if (!context) throw new Error('Cropping is unavailable in this browser.');
       context.imageSmoothingQuality = 'high';
-      context.drawImage(source, x, y, width, height, 0, 0, canvas.width, canvas.height);
+      if (rotation) {
+        context.translate(rotation === 90 || rotation === 180 ? canvas.width : 0,
+          rotation === 180 || rotation === 270 ? canvas.height : 0);
+        context.rotate(rotation * Math.PI / 180);
+      }
+      context.drawImage(source, x, y, width, height, 0, 0, outputWidth, outputHeight);
       const type = photo.file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
       const blob = await new Promise(resolve => canvas.toBlob(resolve, type, 0.97));
       if (!blob) throw new Error('Could not save this crop.');
@@ -78,7 +107,12 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
     onCancel={event => { event.preventDefault(); if (!saving) onCancel(); }}>
     <h2 id="photo-crop-title">Crop photo</h2>
     <p>Drag across the photo to select the area you want to keep. Any aspect ratio works.</p>
-    <div className="photo-crop-stage"
+    <div className="photo-crop-actions photo-crop-rotation" role="group" aria-label="Rotate photo">
+      <button type="button" className="workspace-secondary" disabled={!ready || saving} onClick={() => rotate(-90)}>↶ Rotate left</button>
+      <button type="button" className="workspace-secondary" disabled={!ready || saving} onClick={() => rotate(90)}>↷ Rotate right</button>
+    </div>
+    <div ref={stage} className="photo-crop-stage"
+      style={ready ? { width: `min(100%, ${45 * previewRatio}dvh, ${sideways ? image.current.naturalHeight : image.current.naturalWidth}px)`, aspectRatio: previewRatio } : undefined}
       onPointerDown={event => {
         if (!ready || saving || !event.isPrimary || event.button !== 0) return;
         start.current = { ...point(event), id: event.pointerId };
@@ -88,6 +122,8 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
       onPointerUp={event => { updateSelection(event); start.current = null; }}
       onLostPointerCapture={() => { start.current = null; }}>
       <img ref={image} src={photo.url} alt={photo.name} draggable={false}
+        style={ready ? { position: 'absolute', top: '50%', left: '50%', maxWidth: 'none', maxHeight: 'none',
+          width: sideways ? `${100 / previewRatio}%` : '100%', transform: `translate(-50%, -50%) rotate(${rotation}deg)` } : undefined}
         onLoad={() => setReady(true)} onError={() => setError('Could not open this photo.')} />
       {ready && <div className="photo-crop-selection" aria-hidden="true" style={{
         left: crop.left * 100 + '%', top: crop.top * 100 + '%',
@@ -110,7 +146,7 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
     <div className="photo-crop-actions">
       <button type="button" className="workspace-secondary" disabled={saving} onClick={onCancel}>Cancel</button>
       <button type="button" className="workspace-secondary" disabled={!ready || saving} onClick={() => setCrop(fullPhoto)}>Reset selection</button>
-      <button type="button" className="workspace-primary" disabled={!ready || saving} onClick={applyCrop}>{saving ? 'Applying…' : 'Apply crop'}</button>
+      <button type="button" className="workspace-primary" disabled={!ready || saving} onClick={applyCrop}>{saving ? 'Applying…' : rotation ? 'Apply changes' : 'Apply crop'}</button>
     </div>
   </dialog>;
 }

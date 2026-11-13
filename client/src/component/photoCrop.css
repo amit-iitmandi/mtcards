@@ -15,3 +15,4 @@
 .photo-crop-edges label { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; text-transform: capitalize; font-size: 13px; }
 .storefront .photo-crop-edges input[type="range"] { width: 100%; height: auto; min-height: 24px; margin: 0; padding: 0; transform: none; box-shadow: none; }
 .photo-crop-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.photo-crop-rotation { justify-content: center; margin-bottom: 12px; }
