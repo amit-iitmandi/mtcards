@@ -29,6 +29,10 @@ const categories = [{
   name: 'निमंत्रण पत्र',
   value: 'Invitation Wedding Card'
 }];
+const shopLocation = encodeURIComponent('P9V9+7JV, Shahpur Bahor Rai, Ghazipur, Uttar Pradesh 275203');
+const shopDirections = `https://www.google.com/maps/dir/?api=1&destination=${shopLocation}`;
+const shopMap = `https://www.google.com/maps?q=${shopLocation}&output=embed`;
+
 const formats = ['Single Card', 'Double Fold Card', 'Triple fold Card', 'Box Card', 'Farmaan Card'].map((name, id) => ({
   name,
   id
@@ -73,7 +77,9 @@ function Storefront() {
               id,
               name: c.value
             }))} type2={formats} /></Route></Switch></Route><Route exact path="/login"><Login /></Route><Route exact path="/admin/setup"><AdminSetup /></Route></Switch>
-    <footer className="shop-footer"><div><h2>माँ तारा कार्ड पैलेस</h2><p>हर शुभ अवसर का स्नेहिल आमंत्रण।</p></div><div><span>हमसे मिलें</span><p>जखनियाँ, गाज़ीपुर, उत्तर प्रदेश</p><a href="/#catalogue">कार्ड संग्रह देखें ↗</a></div><div className="footer-bottom">शादी के कार्ड · प्रिंटिंग · खुदरा एवं थोक बिक्री <span>सप्रेम, माँ तारा ❋ · <Link to="/login">व्यवस्थापक लॉगिन</Link></span></div></footer>
+    <footer className="shop-footer"><div><h2>माँ तारा कार्ड पैलेस</h2><p>हर शुभ अवसर का स्नेहिल आमंत्रण।</p></div><div><span>हमसे मिलें</span><p>जखनियाँ, गाज़ीपुर, उत्तर प्रदेश</p><a href={shopDirections} target="_blank" rel="noopener noreferrer">Google Maps पर रास्ता देखें ↗</a></div>
+    {!isAdmin && <iframe className="shop-map" title="Google Maps पर माँ तारा कार्ड पैलेस" src={shopMap} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />}
+    <div className="footer-bottom">शादी के कार्ड · प्रिंटिंग · खुदरा एवं थोक बिक्री <span>सप्रेम, माँ तारा ❋ · <Link to="/login">व्यवस्थापक लॉगिन</Link></span></div></footer>
   </div>;
 }
 

@@ -116,3 +116,13 @@
     linear-gradient(140deg, #553040, #38232f);
   box-shadow: 0 14px 36px #62394126;
 }
+
+.shop-map {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  height: clamp(230px, 34vw, 340px);
+  border: 1px solid #f5ddc675;
+  border-radius: 16px;
+  background: #f5ede5;
+}
