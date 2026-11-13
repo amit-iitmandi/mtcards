@@ -45,3 +45,10 @@
   .photo-crop-tools { max-height: min(33dvh, 260px); }
   .photo-crop-heading p { font-size: 13px; }
 }
+
+.editor-photo-list { display: grid; gap: 8px; padding: 0; list-style: none; }
+.editor-photo-list li { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid #eaded3; border-radius: 10px; }
+.editor-photo-list img { width: 72px; height: 72px; object-fit: contain; background: #f2eee6; border-radius: 6px; }
+.editor-photo-controls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.editor-photo-controls button { min-height: 36px; padding: 4px 8px; border: 1px solid #decabe; border-radius: 6px; background: #fffaf5; color: #612b40; }
+.editor-photo-controls button:disabled { opacity: .45; }

@@ -324,3 +324,20 @@ test('saving replacement photos uploads them and updates an existing card withou
     { expectedVersion: 0, imageAssetIds: [asset.id] }, expect.any(Object));
   expect(screen.getByAltText('Invitation preview')).toHaveAttribute('src', asset.url);
 });
+
+test('changing the cover keeps the saved photos and sends only their new order', async () => {
+  const ids = ['a'.repeat(24), 'b'.repeat(24)];
+  const photos = ['https://example.com/front.jpg', 'https://example.com/inside.jpg'];
+  const card = { ...item, image: photos, imageAssetIds: ids, version: 2 };
+  axios.patch.mockResolvedValue({ data: { card: {
+    ...card, image: [...photos].reverse(), imageAssetIds: [...ids].reverse(), version: 3
+  } } });
+  render(<MemoryRouter><CardEditor item={card} editing {...props} /></MemoryRouter>);
+  fireEvent.click(screen.getByRole('button', { name: 'Make cover' }));
+  expect(screen.getByAltText('Invitation preview')).toHaveAttribute('src', photos[1]);
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByText('Card changes saved.')).toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled();
+  expect(axios.patch).toHaveBeenCalledWith(expect.stringContaining('/admin/cards/abc123'),
+    { expectedVersion: 2, imageAssetIds: [ids[1], ids[0]] }, expect.any(Object));
+});

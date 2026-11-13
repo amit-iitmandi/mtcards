@@ -25,6 +25,12 @@ const newCardDefaults = {
   type2: 'Double Fold Card'
 };
 
+function managedPhotos(card) {
+  const urls = card?.image ?? [];
+  const ids = card?.imageAssetIds ?? [];
+  return ids.length === urls.length ? ids.map((id, index) => ({ id, url: urls[index] })) : [];
+}
+
 export default function CardEditor({
   item,
   editing = false,
@@ -52,14 +58,16 @@ export default function CardEditor({
         [message, setMessage] = useState(''),
         [error, setError] = useState(''),
         [busy, setBusy] = useState(false),
-        [files, setFiles] = useState([]),
+        [files, setFiles] = useState(() => editing ? managedPhotos(item) : []),
         [cropIndex, setCropIndex] = useState(null);
+  const legacyPhotos = editing && !managedPhotos(item).length ? item?.image ?? [] : [];
+  const photosChanged = editing && JSON.stringify(files.map(entry => entry.id)) !== JSON.stringify(managedPhotos(item).map(entry => entry.id));
   const photosLocked = busy || !!createdCard;
   const previews = useRef([]);
   useEffect(() => {
     previews.current = files;
   }, [files]);
-  useEffect(() => () => previews.current.forEach(f => URL.revokeObjectURL(f.url)), []);
+  useEffect(() => () => previews.current.filter(f => f.file).forEach(f => URL.revokeObjectURL(f.url)), []);
 
   const [lastSavedNumber, setLastSavedNumber] = useState(0);
   const highest = Math.max(highestCardNumber ?? 0, lastSavedNumber);
@@ -72,7 +80,8 @@ export default function CardEditor({
     event.target.value = '';
     if (!selected.length || photosLocked) return;
     try {
-      validateSourceImages([...files.map(entry => entry.file), ...selected]);
+      if (files.length + selected.length > 12) throw new Error('A card can have up to 12 photos.');
+      validateSourceImages([...files.filter(entry => entry.file).map(entry => entry.file), ...selected]);
       const entries = selected.map(file => ({ file, name: file.name, url: URL.createObjectURL(file) }));
       setFiles([...files, ...entries]);
       setError('');
@@ -82,8 +91,17 @@ export default function CardEditor({
     }
   }
 
+  function movePhoto(from, to) {
+    setFiles(current => {
+      const next = [...current];
+      const [entry] = next.splice(from, 1);
+      next.splice(to, 0, entry);
+      return next;
+    });
+  }
+
   function applyPhotoCrop(file) {
-    validateSourceImages(files.map((entry, index) => index === cropIndex ? file : entry.file));
+    validateSourceImages(files.map((entry, index) => index === cropIndex ? file : entry.file).filter(Boolean));
     const next = { file, name: file.name, url: URL.createObjectURL(file) };
     URL.revokeObjectURL(files[cropIndex].url);
     setFiles(files.map((entry, index) => index === cropIndex ? next : entry));
@@ -108,7 +126,7 @@ export default function CardEditor({
 
   function finishCreate() {
     try { sessionStorage.removeItem(draftKey); } catch { /* Storage failure must not lock a confirmed save. */ }
-    files.forEach(entry => URL.revokeObjectURL(entry.url));
+    files.filter(entry => entry.file).forEach(entry => URL.revokeObjectURL(entry.url));
     setFiles([]);
     const savedCode = String(cardCode).trim();
     if (/^\d+$/.test(savedCode) && Number.isSafeInteger(Number(savedCode))) {
@@ -161,20 +179,26 @@ export default function CardEditor({
       }
       changes.addedYear = year;
     }
-    if (!Object.keys(changes).length && !files.length) {
+    if (!Object.keys(changes).length && !photosChanged) {
       setMessage('No changes to save.');
       return;
     }
+    if (photosChanged && !files.length) {
+      setError('Keep at least one photo on this card.');
+      return;
+    }
     setBusy(true);
-    setPhase(files.length ? 'Preparing replacement photos…' : 'Saving your changes…');
+    setPhase(photosChanged ? 'Preparing card photos…' : 'Saving your changes…');
     const token = adminToken();
     let assets = [];
     let savingCard = false;
     try {
       if (!token) throw new Error('Your session expired. Please log in again.');
-      if (files.length) {
-        assets = await uploadPhotos(files.map(entry => entry.file), token, setPhase);
-        changes.imageAssetIds = assets.map(asset => asset.id);
+      if (photosChanged) {
+        const newPhotos = files.filter(entry => entry.file);
+        if (newPhotos.length) assets = await uploadPhotos(newPhotos.map(entry => entry.file), token, setPhase);
+        let nextAsset = 0;
+        changes.imageAssetIds = files.map(entry => entry.id ?? assets[nextAsset++].id);
       }
       setPhase('Saving your changes…');
       savingCard = true;
@@ -186,8 +210,8 @@ export default function CardEditor({
         throw new Error('The card update could not be confirmed. Reload the card to check its latest details.');
       }
       try { sessionStorage.removeItem(draftKey); } catch { /* The server save has already succeeded. */ }
-      files.forEach(entry => URL.revokeObjectURL(entry.url));
-      setFiles([]);
+      files.filter(entry => entry.file).forEach(entry => URL.revokeObjectURL(entry.url));
+      setFiles(managedPhotos(data.card));
       setForm(current => ({ ...current, ...data.card }));
       onUpdated(data.card);
       setMessage('Card changes saved.');
@@ -291,17 +315,32 @@ export default function CardEditor({
  {message && <p className="workspace-notice" role="status">{message}</p>}{phase && <p className="workspace-notice" role="status">{phase}</p>}{error && <p className="workspace-error" role="alert">{error}</p>}{pendingStock && <div className="workspace-notice"><button className="workspace-primary" type="button" disabled={busy} onClick={retryStock}>Retry stock update</button> <Link to="/admin/cards">View saved card in library</Link></div>}
  <form className="editor-layout" onSubmit={publish}><div className="editor-fields"><section className="editor-panel"><div className="editor-panel-title"><span>01</span><div><h2>The essentials</h2><p>A clear identity for your card.</p></div></div><fieldset className="editor-form-grid" disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><label>Card code<input required maxLength={50} value={cardCode} onChange={e => field('title', e.target.value)} placeholder="e.g. 108" /></label><label>Card added year<input type="number" required={!editing || item.addedYear != null} min="1900" max={currentCardYear()} step="1" value={form.addedYear ?? ''} onChange={e => field('addedYear', e.target.value)} /></label><label>Category<select value={form.type1} onChange={e => field('type1', e.target.value)}>{type1.map(t => <option key={t.name}>{t.name}</option>)}</select></label><label>Card format<select value={form.type2} onChange={e => field('type2', e.target.value)}>{type2.map(t => <option key={t.name}>{t.name}</option>)}</select></label><label>Recorded stock<input aria-label="Recorded stock" type="number" readOnly={editing} required={!editing} min="0" step="1" value={form.stock} onChange={e => field('stock', e.target.value)} /><small>{editing ? 'Recorded quantity for this card.' : 'Existing units. Sets and envelope counts need inventory integration.'}</small></label><label>Customer price · ₹<input type="number" min="0" required step="0.01" value={form.cPrice} onChange={e => field('cPrice', e.target.value)} /></label><label>Selling price · ₹<input type="number" min="0" required step="0.01" value={form.sPrice} onChange={e => field('sPrice', e.target.value)} /></label><label className="full-width">Description<textarea rows={4} maxLength={2000} value={form.description} onChange={e => field('description', e.target.value)} placeholder="Paper finish, colours, printing details…" /></label></fieldset></section>
  <section className="editor-panel"><div className="editor-panel-title"><span>02</span><div><h2>Let the details shine</h2><p>Choose bright, clear photographs of your invitation.</p></div></div><div className="editor-photo-actions">
-   <label className="editor-dropzone"><span>↑</span><strong>{editing ? 'Choose replacement photos' : 'Choose photos from gallery'}</strong><small>Select your latest photo or choose several · JPG, PNG or WebP</small>
+   <label className="editor-dropzone"><span>↑</span><strong>{legacyPhotos.length ? 'Choose replacement photos' : editing ? 'Add photos' : 'Choose photos from gallery'}</strong><small>Select your latest photo or choose several · JPG, PNG or WebP</small>
      <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={photosLocked} onChange={addPhotos} />
    </label>
    <label className="workspace-secondary editor-camera">Take a photo
      <input type="file" aria-label="Take a photo" accept="image/jpeg,image/png,image/webp" capture="environment" disabled={photosLocked} onChange={addPhotos} />
    </label>
- </div><p className="editor-help">Photos are automatically compressed on your device before secure upload. Use Crop under any photo to trim it before upload. Large photos are resized to 2,400 pixels.</p>{editing && <p className="editor-help">{files.length
-   ? 'Saving will replace all current photos with the selected photos.'
-   : 'To update the photos, select the complete set you want shown on this card.'}</p>}<div className="editor-thumbnails">{(form.image || []).map((url, i) => <div key={`${url}-${i}`}><img src={url} alt={`Invitation detail ${i + 1}`} /></div>)}{files.map((f, i) => <div className="editor-photo-item" key={f.url}><div><img src={f.url} alt={f.name} /><button type="button" disabled={busy || !!createdCard} aria-label={`Remove local preview ${i + 1}`} onClick={() => {
-                URL.revokeObjectURL(f.url);
-                setFiles(v => v.filter((_, n) => n !== i));
-              }}>×</button></div><button type="button" className="workspace-secondary editor-photo-crop-button" disabled={photosLocked} aria-label={`Crop photo ${i + 1}`} onClick={() => setCropIndex(i)}>Crop</button></div>)}</div></section><div className="editor-savebar"><span>{editing ? 'Save changes to this card.' : 'Review your details before creating the card.'}</span><button className="workspace-primary" type="submit" disabled={busy || !!createdCard || cropIndex !== null}>{busy ? (editing ? 'Saving…' : 'Creating…') : editing ? 'Save changes' : createdCard ? 'Card saved · stock pending' : 'Create card'}</button></div></div>
+ </div><p className="editor-help">Photos are automatically compressed on your device before secure upload. Use Crop under any photo to trim it before upload. Large photos are resized to 2,400 pixels.</p>{legacyPhotos.length > 0 && <p className="editor-help">This card uses older photos. To change them, upload the complete set you want to keep.</p>}
+ <p className="editor-help">The first photo is the cover. Move photos to set the order customers see.</p>
+ <div className="editor-thumbnails">{legacyPhotos.map((url, i) => <div key={`${url}-${i}`}><img src={url} alt={`Current photo ${i + 1}`} /></div>)}</div>
+ <ol className="editor-photo-list">{files.map((entry, index) => (
+   <li key={entry.id ?? entry.url}>
+     <img src={entry.url} alt={entry.name ?? `Card photo ${index + 1}`} />
+     <div>
+       <strong>{index === 0 ? 'Cover photo' : `Photo ${index + 1}`}</strong>
+       <div className="editor-photo-controls">
+         {index > 0 && <button type="button" disabled={photosLocked} onClick={() => movePhoto(index, 0)}>Make cover</button>}
+         <button type="button" disabled={photosLocked || index === 0} aria-label={`Move photo ${index + 1} earlier`} onClick={() => movePhoto(index, index - 1)}>↑</button>
+         <button type="button" disabled={photosLocked || index === files.length - 1} aria-label={`Move photo ${index + 1} later`} onClick={() => movePhoto(index, index + 1)}>↓</button>
+         {entry.file && <button type="button" disabled={photosLocked} aria-label={`Crop photo ${index + 1}`} onClick={() => setCropIndex(index)}>Crop</button>}
+         <button type="button" disabled={photosLocked} aria-label={`Remove photo ${index + 1}`} onClick={() => {
+           if (entry.file) URL.revokeObjectURL(entry.url);
+           setFiles(current => current.filter((_, position) => position !== index));
+         }}>Remove</button>
+       </div>
+     </div>
+   </li>
+ ))}</ol></section><div className="editor-savebar"><span>{editing ? 'Save changes to this card.' : 'Review your details before creating the card.'}</span><button className="workspace-primary" type="submit" disabled={busy || !!createdCard || cropIndex !== null}>{busy ? (editing ? 'Saving…' : 'Creating…') : editing ? 'Save changes' : createdCard ? 'Card saved · stock pending' : 'Create card'}</button></div></div>
  <aside className="editor-preview"><p>STOREFRONT PREVIEW</p><div className="preview-card"><div className="preview-image">{files[0]?.url || form.image?.[0] ? <img src={files[0]?.url || form.image?.[0]} alt="Invitation preview" /> : <span>शुभ<br />आमंत्रण</span>}</div><div><small>{form.type1}</small><h3>MT. {cardCode || 'Your card code'}</h3><strong>₹ {form.cPrice || '—'} <small>/ card</small></strong><p>{form.description || 'Your invitation, beautifully presented.'}</p></div></div><div className="preview-tip"><span>✺</span><p>A lovely first impression starts with a clear photo. Keep the background simple and the whole card visible.</p></div></aside></form>{cropIndex !== null && files[cropIndex] && <PhotoCrop photo={files[cropIndex]} onCancel={() => setCropIndex(null)} onApply={applyPhotoCrop} />}</>;
 }
