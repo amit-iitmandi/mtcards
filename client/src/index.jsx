@@ -31,11 +31,18 @@ ReactDOM.render(
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 
-// Cache public card photos across visits. The site still works without a worker.
+// Ask existing installations to pick up the retirement worker promptly.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  const registerImageCache = () => {
-    navigator.serviceWorker.register('/card-image-worker.js').catch(() => {});
-  };
-  if (document.readyState === 'complete') registerImageCache();
-  else window.addEventListener('load', registerImageCache, { once: true });
+  const workerPath = '/card-image-worker.js';
+  const serviceWorkers = navigator.serviceWorker;
+  if (serviceWorkers.controller?.scriptURL === new URL(workerPath, location.origin).href) {
+    serviceWorkers.addEventListener('controllerchange', () => {
+      // A page opened under the old worker may already have failed image requests.
+      for (const photo of document.images) {
+        if (photo.complete && photo.naturalWidth === 0 &&
+            photo.currentSrc.startsWith('https://res.cloudinary.com/')) photo.src = photo.currentSrc;
+      }
+    }, { once: true });
+    serviceWorkers.getRegistration().then(registration => registration?.update()).catch(() => {});
+  }
 }
