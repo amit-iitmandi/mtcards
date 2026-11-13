@@ -18,7 +18,9 @@ const initial = {
 };
 const newCardDefaults = {
   ...initial,
+  title: null,
   cPrice: '40',
+  sPrice: '40',
   stock: '1000',
   type2: 'Double Fold Card'
 };
@@ -26,6 +28,7 @@ const newCardDefaults = {
 export default function CardEditor({
   item,
   editing = false,
+  highestCardNumber = null,
   type1 = [],
   type2 = [],
   onCreated = () => {},
@@ -57,6 +60,12 @@ export default function CardEditor({
     previews.current = files;
   }, [files]);
   useEffect(() => () => previews.current.forEach(f => URL.revokeObjectURL(f.url)), []);
+
+  const [lastSavedNumber, setLastSavedNumber] = useState(0);
+  const highest = Math.max(highestCardNumber ?? 0, lastSavedNumber);
+  const suggestedCode = !editing && highestCardNumber !== null && highest < Number.MAX_SAFE_INTEGER
+    ? String(highest + 1) : '';
+  const cardCode = form.title ?? suggestedCode;
 
   function addPhotos(event) {
     const selected = Array.from(event.target.files || []);
@@ -101,6 +110,10 @@ export default function CardEditor({
     try { sessionStorage.removeItem(draftKey); } catch { /* Storage failure must not lock a confirmed save. */ }
     files.forEach(entry => URL.revokeObjectURL(entry.url));
     setFiles([]);
+    const savedCode = String(cardCode).trim();
+    if (/^\d+$/.test(savedCode) && Number.isSafeInteger(Number(savedCode))) {
+      setLastSavedNumber(previous => Math.max(previous, Number(savedCode)));
+    }
     setForm({ ...newCardDefaults, addedYear: currentCardYear() });
     setCreatedCard(null);
     setPendingStock(null);
@@ -214,7 +227,7 @@ export default function CardEditor({
       assets = await uploadPhotos(rawFiles, token, setPhase);
       setPhase('Saving your card…');
       const payload = {
-        title: String(form.title).trim(),
+        title: String(cardCode).trim(),
         addedYear: Number(form.addedYear),
         cPrice: String(form.cPrice),
         sPrice: String(form.sPrice),
@@ -262,9 +275,9 @@ export default function CardEditor({
   if (editing && !item) return <div className="workspace-empty"><h1>Card not found</h1><Link to="/admin/cards">Back to library</Link></div>;
   return <><Link className="editor-back" to="/admin/cards">← Back to card library</Link><div className="workspace-heading compact"><div><p>MAKE ROOM FOR SOMETHING BEAUTIFUL</p><h1>{editing ? 'Refine your card' : 'A new invitation'}<span className="heading-dot">.</span></h1><span>{editing ? `Editing MT. ${item.title}` : 'Every celebration starts with a little detail.'}</span></div><button className="workspace-secondary" onClick={draft}>Save session draft</button></div>
  {message && <p className="workspace-notice" role="status">{message}</p>}{phase && <p className="workspace-notice" role="status">{phase}</p>}{error && <p className="workspace-error" role="alert">{error}</p>}{pendingStock && <div className="workspace-notice"><button className="workspace-primary" type="button" disabled={busy} onClick={retryStock}>Retry stock update</button> <Link to="/admin/cards">View saved card in library</Link></div>}
- <form className="editor-layout" onSubmit={publish}><div className="editor-fields"><section className="editor-panel"><div className="editor-panel-title"><span>01</span><div><h2>The essentials</h2><p>A clear identity for your card.</p></div></div><fieldset className="editor-form-grid" disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><label>Card code<input required maxLength={50} value={form.title} onChange={e => field('title', e.target.value)} placeholder="e.g. 108" /></label><label>Card added year<input type="number" required={!editing || item.addedYear != null} min="1900" max={currentCardYear()} step="1" value={form.addedYear ?? ''} onChange={e => field('addedYear', e.target.value)} /></label><label>Category<select value={form.type1} onChange={e => field('type1', e.target.value)}>{type1.map(t => <option key={t.name}>{t.name}</option>)}</select></label><label>Card format<select value={form.type2} onChange={e => field('type2', e.target.value)}>{type2.map(t => <option key={t.name}>{t.name}</option>)}</select></label><label>Recorded stock<input aria-label="Recorded stock" type="number" readOnly={editing} required={!editing} min="0" step="1" value={form.stock} onChange={e => field('stock', e.target.value)} /><small>{editing ? 'Recorded quantity for this card.' : 'Existing units. Sets and envelope counts need inventory integration.'}</small></label><label>Customer price · ₹<input type="number" min="0" required step="0.01" value={form.cPrice} onChange={e => field('cPrice', e.target.value)} /></label><label>Selling price · ₹<input type="number" min="0" required step="0.01" value={form.sPrice} onChange={e => field('sPrice', e.target.value)} /></label><label className="full-width">Description<textarea rows={4} maxLength={2000} value={form.description} onChange={e => field('description', e.target.value)} placeholder="Paper finish, colours, printing details…" /></label></fieldset></section>
+ <form className="editor-layout" onSubmit={publish}><div className="editor-fields"><section className="editor-panel"><div className="editor-panel-title"><span>01</span><div><h2>The essentials</h2><p>A clear identity for your card.</p></div></div><fieldset className="editor-form-grid" disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><label>Card code<input required maxLength={50} value={cardCode} onChange={e => field('title', e.target.value)} placeholder="e.g. 108" /></label><label>Card added year<input type="number" required={!editing || item.addedYear != null} min="1900" max={currentCardYear()} step="1" value={form.addedYear ?? ''} onChange={e => field('addedYear', e.target.value)} /></label><label>Category<select value={form.type1} onChange={e => field('type1', e.target.value)}>{type1.map(t => <option key={t.name}>{t.name}</option>)}</select></label><label>Card format<select value={form.type2} onChange={e => field('type2', e.target.value)}>{type2.map(t => <option key={t.name}>{t.name}</option>)}</select></label><label>Recorded stock<input aria-label="Recorded stock" type="number" readOnly={editing} required={!editing} min="0" step="1" value={form.stock} onChange={e => field('stock', e.target.value)} /><small>{editing ? 'Recorded quantity for this card.' : 'Existing units. Sets and envelope counts need inventory integration.'}</small></label><label>Customer price · ₹<input type="number" min="0" required step="0.01" value={form.cPrice} onChange={e => field('cPrice', e.target.value)} /></label><label>Selling price · ₹<input type="number" min="0" required step="0.01" value={form.sPrice} onChange={e => field('sPrice', e.target.value)} /></label><label className="full-width">Description<textarea rows={4} maxLength={2000} value={form.description} onChange={e => field('description', e.target.value)} placeholder="Paper finish, colours, printing details…" /></label></fieldset></section>
  <section className="editor-panel"><div className="editor-panel-title"><span>02</span><div><h2>Let the details shine</h2><p>Choose bright, clear photographs of your invitation.</p></div></div>{!editing && <><div className="editor-photo-actions">
-   <label className="editor-dropzone"><span>↑</span><strong>Choose photos to upload</strong><small>JPG, PNG or WebP · up to 12 photos, 20 MB each</small>
+   <label className="editor-dropzone"><span>↑</span><strong>Choose photos from gallery</strong><small>Select your latest photo or choose several · JPG, PNG or WebP</small>
      <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={photosLocked} onChange={addPhotos} />
    </label>
    <label className="workspace-secondary editor-camera">Take a photo
@@ -274,5 +287,5 @@ export default function CardEditor({
                 URL.revokeObjectURL(f.url);
                 setFiles(v => v.filter((_, n) => n !== i));
               }}>×</button></div><button type="button" className="workspace-secondary editor-photo-crop-button" disabled={photosLocked} aria-label={`Crop photo ${i + 1}`} onClick={() => setCropIndex(i)}>Crop</button></div>)}</div></section><div className="editor-savebar"><span>{editing ? 'Save changes to this card.' : 'Review your details before creating the card.'}</span><button className="workspace-primary" type="submit" disabled={busy || !!createdCard || cropIndex !== null}>{busy ? (editing ? 'Saving…' : 'Creating…') : editing ? 'Save changes' : createdCard ? 'Card saved · stock pending' : 'Create card'}</button></div></div>
- <aside className="editor-preview"><p>STOREFRONT PREVIEW</p><div className="preview-card"><div className="preview-image">{form.image?.[0] || files[0]?.url ? <img src={form.image?.[0] || files[0]?.url} alt="Invitation preview" /> : <span>शुभ<br />आमंत्रण</span>}</div><div><small>{form.type1}</small><h3>MT. {form.title || 'Your card code'}</h3><strong>₹ {form.cPrice || '—'} <small>/ card</small></strong><p>{form.description || 'Your invitation, beautifully presented.'}</p></div></div><div className="preview-tip"><span>✺</span><p>A lovely first impression starts with a clear photo. Keep the background simple and the whole card visible.</p></div></aside></form>{cropIndex !== null && files[cropIndex] && <PhotoCrop photo={files[cropIndex]} onCancel={() => setCropIndex(null)} onApply={applyPhotoCrop} />}</>;
+ <aside className="editor-preview"><p>STOREFRONT PREVIEW</p><div className="preview-card"><div className="preview-image">{form.image?.[0] || files[0]?.url ? <img src={form.image?.[0] || files[0]?.url} alt="Invitation preview" /> : <span>शुभ<br />आमंत्रण</span>}</div><div><small>{form.type1}</small><h3>MT. {cardCode || 'Your card code'}</h3><strong>₹ {form.cPrice || '—'} <small>/ card</small></strong><p>{form.description || 'Your invitation, beautifully presented.'}</p></div></div><div className="preview-tip"><span>✺</span><p>A lovely first impression starts with a clear photo. Keep the background simple and the whole card visible.</p></div></aside></form>{cropIndex !== null && files[cropIndex] && <PhotoCrop photo={files[cropIndex]} onCancel={() => setCropIndex(null)} onApply={applyPhotoCrop} />}</>;
 }
