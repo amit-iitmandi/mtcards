@@ -116,23 +116,36 @@ test('failed archive keeps card and shows retryable error', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('could not be archived');
   expect(screen.getByText('MT. 108')).toBeInTheDocument();
 });
-test('edit drafts are local only and publishing is disabled', () => {
-  render(<MemoryRouter><CardEditor {...props} editing item={item} /></MemoryRouter>);
-  fireEvent.change(screen.getByLabelText('Card code'), {
-    target: {
-      value: '109'
-    }
-  });
-  fireEvent.click(screen.getByRole('button', {
-    name: 'Save session draft'
-  }));
+test('editing a legacy card saves changed details with its version and refreshes the library', async () => {
+  axios.patch.mockResolvedValue({ data: { card: { ...item, title: '109', version: 1, addedYear: null } } });
+  const { container } = workspace('/admin/cards/abc123/edit');
+  await screen.findByLabelText('Card code');
+  expect(screen.getByLabelText('Card added year')).not.toBeRequired();
+  expect(screen.getByLabelText('Recorded stock')).toHaveAttribute('readonly');
+  fireEvent.change(screen.getByLabelText('Card code'), { target: { value: '109' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save session draft' }));
   expect(screen.getByRole('status')).toHaveTextContent('live card has not changed');
-  expect(JSON.parse(sessionStorage.getItem('mtcards:card-draft:abc123')).title).toBe('109');
-  expect(screen.getByRole('button', {
-    name: 'Publish changes · pending'
-  })).toBeDisabled();
-  expect(axios.post).not.toHaveBeenCalled();
+  expect(axios.patch).not.toHaveBeenCalled();
+
+  fireEvent.submit(container.querySelector('form'));
+  expect(await screen.findByText('Card changes saved.')).toBeInTheDocument();
+  expect(axios.patch).toHaveBeenCalledWith(expect.stringContaining('/admin/cards/abc123'),
+    { title: '109', expectedVersion: 0 },
+    expect.objectContaining({ headers: { Authorization: 'Bearer test' } }));
+  expect(sessionStorage.getItem('mtcards:card-draft:abc123')).toBeNull();
+  fireEvent.click(screen.getByRole('link', { name: /Back to card library/ }));
+  expect(screen.getByText('MT. 109')).toBeInTheDocument();
 });
+
+test('a version conflict keeps the edit visible and asks the admin to refresh', async () => {
+  axios.patch.mockRejectedValue({ response: { status: 409 } });
+  const { container } = workspace('/admin/cards/abc123/edit');
+  fireEvent.change(await screen.findByLabelText('Card code'), { target: { value: '109' } });
+  fireEvent.submit(container.querySelector('form'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Refresh the page');
+  expect(screen.getByLabelText('Card code')).toHaveValue('109');
+});
+
 test('new card signs photos, uploads to the API and saves managed image IDs', async () => {
   const cleanup = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('Storage blocked'); });
   const onCreated = vi.fn();
