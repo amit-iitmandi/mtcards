@@ -303,3 +303,24 @@ test('rotating after selecting a crop preserves the selected pixels', async () =
     encode.mockRestore();
   }
 });
+
+test('saving replacement photos uploads them and updates an existing card without creating another', async () => {
+  const asset = { id: 'a'.repeat(24), url: 'https://res.cloudinary.com/demo/image/upload/replacement.jpg' };
+  URL.createObjectURL = vi.fn(() => 'blob:replacement');
+  URL.revokeObjectURL = vi.fn();
+  axios.post.mockResolvedValueOnce({ data: { uploadUrl: '/admin/uploads?ticketId=' + 'b'.repeat(24) } })
+    .mockResolvedValueOnce({ data: { assets: [asset] } });
+  axios.patch.mockResolvedValue({ data: { card: { ...item, image: [asset.url], imageAssetIds: [asset.id], version: 1 } } });
+  const { container } = workspace('/admin/cards/abc123/edit');
+  await screen.findByLabelText('Card code');
+  fireEvent.change(container.querySelector('input[type=file]'), {
+    target: { files: [new File(['jpeg'], 'replacement.jpg', { type: 'image/jpeg' })] }
+  });
+  expect(screen.getByAltText('Invitation preview')).toHaveAttribute('src', 'blob:replacement');
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByText('Card changes saved.')).toBeInTheDocument();
+  expect(axios.post).toHaveBeenCalledTimes(2);
+  expect(axios.patch).toHaveBeenCalledWith(expect.stringContaining('/admin/cards/abc123'),
+    { expectedVersion: 0, imageAssetIds: [asset.id] }, expect.any(Object));
+  expect(screen.getByAltText('Invitation preview')).toHaveAttribute('src', asset.url);
+});
