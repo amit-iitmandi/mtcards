@@ -45,7 +45,7 @@ function Workspace({
     setStatus('loading');
     loadCards({ admin: true, token: adminToken() }).then(data => {
       if (active) {
-        setCards(data);
+        setCards(data.filter(card => card.status !== 'archived'));
         setStatus('ready');
       }
     }).catch(() => {
@@ -60,13 +60,13 @@ function Workspace({
         out = known.filter(c => stockNumber(c.stock) === 0);
   const visible = cards.filter(c => String(c.title || '').toLowerCase().includes(query.toLowerCase()) && (!category || c.type1 === category) && (stockFilter === 'all' || stockNumber(c.stock) !== null && (stockFilter === 'out' ? stockNumber(c.stock) === 0 : stockNumber(c.stock) > 0 && stockNumber(c.stock) <= 20)));
 
-  async function deleteCard() {
-    if (busy) return;
+  async function archiveCard() {
+    if (busy || !deleting) return;
     setBusy(true);
     setNotice('');
 
     try {
-      const token = JSON.parse(sessionStorage.getItem('token'))?.data?.token;
+      const token = adminToken();
       if (!token) throw Error();
       const {
         data
@@ -76,15 +76,15 @@ function Workspace({
         },
         timeout: 15000
       });
-      if (data?.success !== true) throw Error();
+      if (data?.success !== true || data.archived !== true) throw Error();
       setCards(list => list.filter(c => c._id !== deleting._id));
       setDeleting(null);
-      setNotice('Card deleted.');
+      setNotice('Card archived.');
     } catch (err) {
       if (err.response?.status === 401) {
         sessionStorage.removeItem('token');
         history.replace('/login');
-      } else setNotice('Card could not be deleted. Please retry.');
+      } else setNotice('Card could not be archived. Please retry.');
     } finally {
       setBusy(false);
     }
@@ -107,7 +107,7 @@ function Workspace({
               return <tr key={c._id || i}><td><div className="workspace-product">{c.image?.[0] ? <img src={c.image[0]} alt="" loading="lazy" /> : <span>✺</span>}<div><strong>MT. {c.title}</strong><small>{c.type2 || 'Wedding invitation'}</small></div></div></td><td>{c.type1 || '—'}</td><td>{stockOnly ? n === null ? 'Not recorded' : n.toLocaleString('en-IN') : money(c.sPrice)}</td><td><span className={`stock-badge ${n === null ? 'unknown' : n === 0 ? 'out' : n <= 20 ? 'low' : 'available'}`}>{n === null ? 'Not recorded' : n === 0 ? 'Out of stock' : n <= 20 ? 'Low stock' : stockOnly ? 'In stock' : `${n} units`}</span></td><td><div className="row-actions"><Link to={`/admin/cards/${encodeURIComponent(c._id || 'unknown')}/edit`}>{stockOnly ? 'View / adjust' : 'Edit'}</Link><button disabled={!c._id} onClick={() => {
                       setNotice('');
                       setDeleting(c);
-                    }}>Delete</button></div></td></tr>;
+                    }}>Archive</button></div></td></tr>;
             })}</tbody></table></div>{!visible.length && <Empty title="No cards found">Try another code or category, or add your first card.</Empty>}<div className="workspace-table-footer">{visible.length} of {cards.length} designs <span>Stock figures are the existing recorded values.</span></div></>;
   }
 
@@ -123,7 +123,7 @@ function Workspace({
  <Route exact path="/admin/enquiries"><div className="workspace-heading compact"><div><p>KEEP THE CONVERSATION GOING</p><h1>Enquiry inbox<span className="heading-dot">.</span></h1><span>From a first hello to their perfect invitation.</span></div></div><div className="inbox-layout"><div className="inbox-tabs"><strong>All conversations</strong><span>New</span><span>Following up</span><span>Closed</span></div><Empty title="Your conversations will belong here">The inbox is awaiting connection. Email and WhatsApp conversations are not imported automatically.</Empty></div><div className="workspace-note light"><h2>Designed for the way you work</h2><p>Selected cards, quantities, event date, contact details and follow-up status will stay together in each enquiry.</p></div></Route>
  <Route exact path="/admin/settings"><div className="workspace-heading compact"><div><p>THE DETAILS THAT MAKE IT YOURS</p><h1>Shop settings<span className="heading-dot">.</span></h1></div></div><div className="settings-grid"><article className="workspace-note light"><h2>Shop identity</h2><p>माँ तारा कार्ड पैलेस</p><p>जखनियाँ, गाज़ीपुर, उत्तर प्रदेश</p><small>Shop profile editing awaits settings integration.</small></article><article className="workspace-note light"><h2>Inventory preferences</h2><p>Counting unit: sets (planned)</p><p>Low-stock view: 20 recorded units</p><small>Per-card thresholds and envelope tracking await inventory integration.</small></article><article className="workspace-note light"><h2>Your account</h2><p>Your account is verified by the administrator session endpoint.</p><button className="workspace-secondary" onClick={logout}>Log out securely</button></article></div></Route>
  <Route><Empty title="Page not found"><Link to="/admin">Back to overview</Link></Empty></Route>
- </Switch></div></main>{deleting && <DeleteDialog item={deleting} busy={busy} notice={notice} cancel={() => !busy && setDeleting(null)} confirm={deleteCard} />}</div>;
+ </Switch></div></main>{deleting && <DeleteDialog item={deleting} busy={busy} notice={notice} cancel={() => !busy && setDeleting(null)} confirm={archiveCard} />}</div>;
 }
 
 function DeleteDialog({
@@ -153,5 +153,5 @@ function DeleteDialog({
           first.focus();
         }
       }
-    }}><span className="delete-symbol">!</span><h2 id="delete-title">Delete MT. {item.title}?</h2><p>This permanently removes this card from the catalogue. This action cannot be undone.</p>{notice && <p role="alert">{notice}</p>}<div><button autoFocus disabled={busy} onClick={cancel}>Keep card</button><button className="danger-action" disabled={busy} onClick={confirm}>{busy ? 'Deleting…' : 'Delete permanently'}</button></div></section></div>;
+    }}><span className="delete-symbol">!</span><h2 id="delete-title">Archive MT. {item.title}?</h2><p>This removes the card from the storefront, card library and stock room. Its record is kept.</p>{notice && <p role="alert">{notice}</p>}<div><button autoFocus disabled={busy} onClick={cancel}>Keep card</button><button className="danger-action" disabled={busy} onClick={confirm}>{busy ? 'Archiving…' : 'Archive card'}</button></div></section></div>;
 }
