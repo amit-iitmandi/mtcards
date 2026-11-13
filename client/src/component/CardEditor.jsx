@@ -16,6 +16,13 @@ const initial = {
   type1: 'Hindu Wedding Card',
   type2: 'Single Card'
 };
+const newCardDefaults = {
+  ...initial,
+  cPrice: '40',
+  stock: '1000',
+  type2: 'Double Fold Card'
+};
+
 export default function CardEditor({
   item,
   editing = false,
@@ -26,7 +33,7 @@ export default function CardEditor({
 }) {
   const draftKey = `mtcards:card-draft:${editing ? item?._id || 'missing' : 'new'}`;
   const [form, setForm] = useState(() => {
-    const defaults = { ...initial, addedYear: editing ? null : currentCardYear(), ...item };
+    const defaults = { ...(editing ? initial : newCardDefaults), addedYear: editing ? null : currentCardYear(), ...item };
     try {
       const saved = JSON.parse(sessionStorage.getItem(draftKey) || 'null');
       if (editing && saved && (saved.version ?? 0) !== (item?.version ?? 0)) return defaults;
@@ -94,7 +101,7 @@ export default function CardEditor({
     try { sessionStorage.removeItem(draftKey); } catch { /* Storage failure must not lock a confirmed save. */ }
     files.forEach(entry => URL.revokeObjectURL(entry.url));
     setFiles([]);
-    setForm({ ...initial, addedYear: currentCardYear() });
+    setForm({ ...newCardDefaults, addedYear: currentCardYear() });
     setCreatedCard(null);
     setPendingStock(null);
     setMessage('Card created in the catalogue with its photos and stock.');
@@ -267,5 +274,5 @@ export default function CardEditor({
                 URL.revokeObjectURL(f.url);
                 setFiles(v => v.filter((_, n) => n !== i));
               }}>×</button></div><button type="button" className="workspace-secondary editor-photo-crop-button" disabled={photosLocked} aria-label={`Crop photo ${i + 1}`} onClick={() => setCropIndex(i)}>Crop</button></div>)}</div></section><div className="editor-savebar"><span>{editing ? 'Save changes to this card.' : 'Review your details before creating the card.'}</span><button className="workspace-primary" type="submit" disabled={busy || !!createdCard || cropIndex !== null}>{busy ? (editing ? 'Saving…' : 'Creating…') : editing ? 'Save changes' : createdCard ? 'Card saved · stock pending' : 'Create card'}</button></div></div>
- <aside className="editor-preview"><p>STOREFRONT PREVIEW</p><div className="preview-card"><div className="preview-image">{form.image?.[0] || files[0]?.url ? <img src={form.image?.[0] || files[0]?.url} alt="Invitation preview" /> : <span>शुभ<br />आमंत्रण</span>}</div><div><small>{form.type1}</small><h3>MT. {form.title || 'Your card code'}</h3><strong>₹ {form.sPrice || '—'} <small>/ card</small></strong><p>{form.description || 'Your invitation, beautifully presented.'}</p></div></div><div className="preview-tip"><span>✺</span><p>A lovely first impression starts with a clear photo. Keep the background simple and the whole card visible.</p></div></aside></form>{cropIndex !== null && files[cropIndex] && <PhotoCrop photo={files[cropIndex]} onCancel={() => setCropIndex(null)} onApply={applyPhotoCrop} />}</>;
+ <aside className="editor-preview"><p>STOREFRONT PREVIEW</p><div className="preview-card"><div className="preview-image">{form.image?.[0] || files[0]?.url ? <img src={form.image?.[0] || files[0]?.url} alt="Invitation preview" /> : <span>शुभ<br />आमंत्रण</span>}</div><div><small>{form.type1}</small><h3>MT. {form.title || 'Your card code'}</h3><strong>₹ {form.cPrice || '—'} <small>/ card</small></strong><p>{form.description || 'Your invitation, beautifully presented.'}</p></div></div><div className="preview-tip"><span>✺</span><p>A lovely first impression starts with a clear photo. Keep the background simple and the whole card visible.</p></div></aside></form>{cropIndex !== null && files[cropIndex] && <PhotoCrop photo={files[cropIndex]} onCancel={() => setCropIndex(null)} onApply={applyPhotoCrop} />}</>;
 }
