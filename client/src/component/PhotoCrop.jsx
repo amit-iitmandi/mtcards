@@ -11,6 +11,24 @@ function rotateSelection({ left, top, right, bottom }, rotation) {
   }
 }
 
+const neutral = { brightness: 100, contrast: 100, saturation: 100 };
+
+function applyColor(context, width, height, { brightness, contrast, saturation }) {
+  const pixels = context.getImageData(0, 0, width, height);
+  const tone = value => (value * brightness / 100 - 127.5) * contrast / 100 + 127.5;
+  const amount = saturation / 100;
+  for (let index = 0; index < pixels.data.length; index += 4) {
+    const red = tone(pixels.data[index]);
+    const green = tone(pixels.data[index + 1]);
+    const blue = tone(pixels.data[index + 2]);
+    const luminance = 0.213 * red + 0.715 * green + 0.072 * blue;
+    pixels.data[index] = luminance + (red - luminance) * amount;
+    pixels.data[index + 1] = luminance + (green - luminance) * amount;
+    pixels.data[index + 2] = luminance + (blue - luminance) * amount;
+  }
+  context.putImageData(pixels, 0, 0);
+}
+
 const edges = ['left', 'top', 'right', 'bottom'];
 
 export default function PhotoCrop({ photo, onCancel, onApply }) {
@@ -18,6 +36,11 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
   const image = useRef(null);
   const start = useRef(null);
   const stage = useRef(null);
+  const frame = useRef(null);
+  const [available, setAvailable] = useState({ width: 0, height: 0 });
+  const [color, setColor] = useState(neutral);
+  const adjusted = Object.keys(neutral).some(key => color[key] !== neutral[key]);
+  const filter = `brightness(${color.brightness}%) contrast(${color.contrast}%) saturate(${color.saturation}%)`;
   const [rotation, setRotation] = useState(0);
   const [crop, setCrop] = useState(fullPhoto);
   const [ready, setReady] = useState(false);
@@ -26,6 +49,21 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
   const sideways = rotation % 180 !== 0;
   const sourceRatio = ready ? image.current.naturalWidth / image.current.naturalHeight : 1;
   const previewRatio = sideways ? 1 / sourceRatio : sourceRatio;
+  const previewWidth = Math.min(available.width, available.height * previewRatio);
+  const previewHeight = previewWidth / previewRatio;
+
+  useEffect(() => {
+    const element = frame.current;
+    const measure = () => setAvailable({ width: element.clientWidth, height: element.clientHeight });
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   function rotate(direction) {
     start.current = null;
@@ -64,7 +102,7 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
   }
 
   async function applyCrop() {
-    if (crop === fullPhoto && rotation === 0) { onCancel(); return; }
+    if (crop === fullPhoto && rotation === 0 && !adjusted) { onCancel(); return; }
     setSaving(true);
     setError('');
     const source = image.current;
@@ -88,7 +126,10 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
           rotation === 180 || rotation === 270 ? canvas.height : 0);
         context.rotate(rotation * Math.PI / 180);
       }
+      const nativeFilter = adjusted && typeof context.filter === 'string';
+      if (nativeFilter) context.filter = filter;
       context.drawImage(source, x, y, width, height, 0, 0, outputWidth, outputHeight);
+      if (adjusted && !nativeFilter) applyColor(context, canvas.width, canvas.height, color);
       const type = photo.file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
       const blob = await new Promise(resolve => canvas.toBlob(resolve, type, 0.97));
       if (!blob) throw new Error('Could not save this crop.');
@@ -105,14 +146,12 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
 
   return <dialog ref={dialog} className="photo-crop" aria-labelledby="photo-crop-title"
     onCancel={event => { event.preventDefault(); if (!saving) onCancel(); }}>
-    <h2 id="photo-crop-title">Crop photo</h2>
-    <p>Drag across the photo to select the area you want to keep. Any aspect ratio works.</p>
-    <div className="photo-crop-actions photo-crop-rotation" role="group" aria-label="Rotate photo">
-      <button type="button" className="workspace-secondary" disabled={!ready || saving} onClick={() => rotate(-90)}>↶ Rotate left</button>
-      <button type="button" className="workspace-secondary" disabled={!ready || saving} onClick={() => rotate(90)}>↷ Rotate right</button>
-    </div>
+    <header className="photo-crop-heading"><h2 id="photo-crop-title">Crop photo</h2>
+    <p>Drag across the photo to select the area you want to keep. Any aspect ratio works.</p></header>
+    <div className="photo-crop-workspace">
+    <div ref={frame} className="photo-crop-frame">
     <div ref={stage} className="photo-crop-stage"
-      style={ready ? { width: `min(100%, ${45 * previewRatio}dvh, ${sideways ? image.current.naturalHeight : image.current.naturalWidth}px)`, aspectRatio: previewRatio } : undefined}
+      style={ready ? { width: previewWidth, height: previewHeight } : undefined}
       onPointerDown={event => {
         if (!ready || saving || !event.isPrimary || event.button !== 0) return;
         start.current = { ...point(event), id: event.pointerId };
@@ -123,12 +162,18 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
       onLostPointerCapture={() => { start.current = null; }}>
       <img ref={image} src={photo.url} alt={photo.name} draggable={false}
         style={ready ? { position: 'absolute', top: '50%', left: '50%', maxWidth: 'none', maxHeight: 'none',
-          width: sideways ? `${100 / previewRatio}%` : '100%', transform: `translate(-50%, -50%) rotate(${rotation}deg)` } : undefined}
+          width: sideways ? previewHeight : previewWidth, height: sideways ? previewWidth : previewHeight, filter, transform: `translate(-50%, -50%) rotate(${rotation}deg)` } : undefined}
         onLoad={() => setReady(true)} onError={() => setError('Could not open this photo.')} />
       {ready && <div className="photo-crop-selection" aria-hidden="true" style={{
         left: crop.left * 100 + '%', top: crop.top * 100 + '%',
         right: (1 - crop.right) * 100 + '%', bottom: (1 - crop.bottom) * 100 + '%'
       }} />}
+    </div>
+    </div>
+    <aside className="photo-crop-tools">
+    <div className="photo-crop-actions photo-crop-rotation" role="group" aria-label="Rotate photo">
+      <button type="button" className="workspace-secondary" disabled={!ready || saving} onClick={() => rotate(-90)}>↶ Rotate left</button>
+      <button type="button" className="workspace-secondary" disabled={!ready || saving} onClick={() => rotate(90)}>↷ Rotate right</button>
     </div>
     <div className="photo-crop-edges" aria-label="Crop edges" role="group">
       {edges.map(edge => {
@@ -142,11 +187,23 @@ export default function PhotoCrop({ photo, onCancel, onApply }) {
         </label>;
       })}
     </div>
+    <div className="photo-crop-color" role="group" aria-label="Colour adjustments">
+      {Object.keys(neutral).map(key => <label key={key}>
+        <span>{key}</span><output>{color[key]}%</output>
+        <input type="range" aria-label={key} min={key === 'saturation' ? 0 : 50} max="150"
+          value={color[key]} disabled={!ready || saving}
+          onChange={event => setColor({ ...color, [key]: Number(event.target.value) })} />
+      </label>)}
+      <button type="button" className="workspace-secondary" disabled={!adjusted || saving}
+        onClick={() => setColor(neutral)}>Reset colour</button>
+    </div>
+    </aside>
+    </div>
     {error && <p role="alert">{error}</p>}
     <div className="photo-crop-actions">
       <button type="button" className="workspace-secondary" disabled={saving} onClick={onCancel}>Cancel</button>
       <button type="button" className="workspace-secondary" disabled={!ready || saving} onClick={() => setCrop(fullPhoto)}>Reset selection</button>
-      <button type="button" className="workspace-primary" disabled={!ready || saving} onClick={applyCrop}>{saving ? 'Applying…' : rotation ? 'Apply changes' : 'Apply crop'}</button>
+      <button type="button" className="workspace-primary" disabled={!ready || saving} onClick={applyCrop}>{saving ? 'Applying…' : (rotation || adjusted) ? 'Apply changes' : 'Apply crop'}</button>
     </div>
   </dialog>;
 }
