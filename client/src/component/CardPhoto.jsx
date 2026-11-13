@@ -45,6 +45,7 @@ export default function CardPhoto({ src, alt }) {
         if (event.detail > 0 && mouseClick && !event.target.closest('button')) dialog.current.close();
       }}
       onKeyDown={event => { if (event.key === 'Escape') event.stopPropagation(); }}>
+      <img className="card-photo-ambient" src={src} alt="" aria-hidden="true" loading="lazy" />
       <div className="card-photo-toolbar">
         <button type="button" aria-label="छोटा करें" disabled={zoom === 1} onClick={() => changeZoom(zoom - 0.5)}>−</button>
         <button type="button" aria-label="मूल आकार" onClick={() => changeZoom(1)}>{zoom * 100}%</button>
