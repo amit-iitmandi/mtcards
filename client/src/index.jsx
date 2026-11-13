@@ -30,3 +30,12 @@ ReactDOM.render(
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
+
+// Cache public card photos across visits. The site still works without a worker.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  const registerImageCache = () => {
+    navigator.serviceWorker.register('/card-image-worker.js').catch(() => {});
+  };
+  if (document.readyState === 'complete') registerImageCache();
+  else window.addEventListener('load', registerImageCache, { once: true });
+}
