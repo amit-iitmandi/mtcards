@@ -92,3 +92,15 @@
 }
 .card-photo-toolbar > button:hover:not(:disabled) { background: #ffffff30; }
 .card-photo-scroll { position: relative; }
+
+.card-photo-toolbar { flex-wrap: wrap; }
+.card-photo-navigation { display: flex; align-items: center; gap: 6px; }
+.card-photo-navigation span { min-width: 42px; text-align: center; font-size: 13px; }
+.card-photo-navigation button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #ffffff50;
+  border-radius: 8px;
+  background: #ffffff18;
+  color: white;
+}
