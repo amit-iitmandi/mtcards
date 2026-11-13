@@ -31,6 +31,7 @@ function Workspace({
   type2
 }) {
   const [cards, setCards] = useState([]),
+        [highestCardNumber, setHighestCardNumber] = useState(null),
         [status, setStatus] = useState('loading'),
         [attempt, setAttempt] = useState(0),
         [query, setQuery] = useState(''),
@@ -45,6 +46,12 @@ function Workspace({
     setStatus('loading');
     loadCards({ admin: true, token: adminToken() }).then(data => {
       if (active) {
+        const highest = data.reduce((max, card) => {
+          const code = String(card.title ?? '').trim();
+          const number = /^\d+$/.test(code) ? Number(code) : 0;
+          return Number.isSafeInteger(number) ? Math.max(max, number) : max;
+        }, 0);
+        setHighestCardNumber(previous => Math.max(previous ?? 0, highest));
         setCards(data.filter(card => card.status !== 'archived'));
         setStatus('ready');
       }
@@ -116,7 +123,7 @@ function Workspace({
  <Route exact path="/admin"><div className="workspace-heading"><div><p>THE EVERYDAY, MADE EASIER</p><h1>A little order.<br /><em>A lot of possibilities.</em></h1><span>Your cards, stock and conversations. All in one place.</span></div><Link className="workspace-primary" to="/admin/cards/new">＋ Add a card</Link></div>{metrics}{content || <><div className="workspace-section-title"><h2>Your card collection</h2><Link to="/admin/cards">View all designs ↗</Link></div><div className="workspace-recent">{cards.slice(0, 4).map((c, i) => <Link key={c._id || i} to={`/admin/cards/${encodeURIComponent(c._id || 'unknown')}/edit`}>{c.image?.[0] ? <img src={c.image[0]} alt={`Card ${c.title}`} /> : <div className="recent-placeholder">✺</div>}<div><strong>MT. {c.title}</strong><span>{money(c.sPrice)}</span></div></Link>)}</div>{!cards.length && <Empty title="Your collection starts here">Add a card to bring your shop catalogue to life.</Empty>}<div className="workspace-bottom-grid"><article className="workspace-note"><span>STOCK CHECK</span><h2>A little check, before<br />the next celebration.</h2><p>{low.length + out.length} designs have low or zero recorded stock.</p><Link to="/admin/stock">Open stock room →</Link></article><article className="workspace-note light"><span>YOUR NEXT CONVERSATION</span><h2>Every enquiry is<br />a new beginning.</h2><p>Enquiry tracking will appear here when connected.</p><Link to="/admin/enquiries">Explore enquiries →</Link></article></div></>}</Route>
  <Route exact path="/admin/cards"><div className="workspace-heading compact"><div><p>THE COLLECTION</p><h1>Card library<span className="heading-dot">.</span></h1><span>A home for every beautiful invitation.</span></div><Link className="workspace-primary" to="/admin/cards/new">＋ Add a card</Link></div>{content || table()}</Route>
  <Route exact path="/admin/stock"><div className="workspace-heading compact"><div><p>KNOW WHAT’S ON YOUR SHELF</p><h1>The stock room<span className="heading-dot">.</span></h1><span>Search every design and spot what needs replenishing.</span></div></div>{metrics}<p className="workspace-notice">Legacy quantities are shown as recorded units. Sets, reservations and stock adjustments await inventory integration.</p>{content || table(true)}</Route>
- <Route exact path="/admin/cards/new"><CardEditor type1={type1} type2={type2} onCreated={() => setAttempt(value => value + 1)} /></Route>
+ <Route exact path="/admin/cards/new"><CardEditor type1={type1} type2={type2} highestCardNumber={highestCardNumber} onCreated={() => setAttempt(value => value + 1)} /></Route>
  <Route path="/admin/cards/:id/edit" render={({
             match
           }) => content || <CardEditor key={match.params.id} item={cards.find(c => c._id === match.params.id)} editing type1={type1} type2={type2} onUpdated={updated => setCards(list => list.map(card => card._id === updated._id ? updated : card))} />} />
