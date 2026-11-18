@@ -1,7 +1,8 @@
+import { trackPageView } from './utils/analytics';
 import { whatsappUrl } from './utils/inquiry';
 import './App.css';
 import './storefront.css';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Switch, Route, Link, Redirect, useLocation } from 'react-router-dom';
 import Home from './component/Home';
 import FeaturedCardsCarousel from './component/FeaturedCardsCarousel';
@@ -52,6 +53,7 @@ function App() {
 
 function Storefront() {
   const location = useLocation();
+  useEffect(() => { trackPageView(location.pathname); }, [location.pathname]);
   const {ids}=useShortlist();
   const isAdmin = location.pathname.startsWith("/admin") && location.pathname !== "/admin/setup";
   const [filter, setFilter] = useState('');
