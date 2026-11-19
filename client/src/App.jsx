@@ -1,7 +1,8 @@
+import { trackPageView, trackConversion } from './utils/analytics';
 import { whatsappUrl } from './utils/inquiry';
 import './App.css';
 import './storefront.css';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Switch, Route, Link, Redirect, useLocation } from 'react-router-dom';
 import Home from './component/Home';
 import FeaturedCardsCarousel from './component/FeaturedCardsCarousel';
@@ -52,6 +53,15 @@ function App() {
 
 function Storefront() {
   const location = useLocation();
+  useEffect(() => { trackPageView(location.pathname); }, [location.pathname]);
+  useEffect(() => {
+    const trackClick = event => {
+      const link = event.target.closest?.('a[href]');
+      if (link && new URL(link.href).hostname === 'wa.me') trackConversion('whatsapp_click');
+    };
+    document.addEventListener('click', trackClick);
+    return () => document.removeEventListener('click', trackClick);
+  }, []);
   const {ids}=useShortlist();
   const isAdmin = location.pathname.startsWith("/admin") && location.pathname !== "/admin/setup";
   const [filter, setFilter] = useState('');

@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   // Explicit public-only whitelist: never inject process.env or all env values.
   const env = loadEnv(mode, process.cwd(), 'REACT_APP_');
-  const keys = ['REACT_APP_API_BASE_URL', 'REACT_APP_WHATSAPP_NUMBER', 'REACT_APP_ENQUIRY_EMAIL'];
+  const keys = ['REACT_APP_API_BASE_URL', 'REACT_APP_WHATSAPP_NUMBER', 'REACT_APP_ENQUIRY_EMAIL', 'REACT_APP_GA_MEASUREMENT_ID'];
   const define = mode === 'test' ? {} : Object.fromEntries(keys.map(key => ['process.env.' + key, JSON.stringify(env[key] || '')]));
   return { plugins: [react({ jsxRuntime: 'automatic' })], define,
     build: { outDir: 'build', sourcemap: false },

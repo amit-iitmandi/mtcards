@@ -126,3 +126,14 @@
   border-radius: 16px;
   background: #f5ede5;
 }
+
+.card-lead { margin-top: 24px; padding: 18px; border: 1px solid #d9bfb0; border-radius: 14px; background: #fffaf2; }
+.card-lead summary { cursor: pointer; color: #673044; }
+.card-lead form { display: grid; gap: 14px; margin-top: 18px; }
+.card-lead label { display: grid; gap: 7px; }
+.card-lead input:not([type=checkbox]) { width: 100%; min-height: 44px; padding: 10px; border: 1px solid #cdb7a7; border-radius: 7px; }
+.card-lead label:has(input[type=checkbox]) { display: flex; align-items: start; }
+.lead-filter { display: grid; gap: 8px; max-width: 250px; margin: 22px 0; }
+.lead-list { display: grid; gap: 14px; margin-bottom: 20px; }
+.lead-list article { padding: 20px; border: 1px solid #ded8cc; background: #fffdf7; border-radius: 12px; }
+.lead-list h2 { font-size: 20px; }

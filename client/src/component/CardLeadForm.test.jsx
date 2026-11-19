@@ -1,0 +1,20 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { vi, test, expect } from 'vitest';
+import axios from 'axios';
+import CardLeadForm from './CardLeadForm';
+vi.mock('axios');
+test('a failed submission retries with the same key and only a confirmed save shows success', async () => {
+  axios.post.mockRejectedValueOnce(new Error('timeout')).mockResolvedValueOnce({ data: { id: 'confirmed' } });
+  render(<CardLeadForm card={{ _id: 'card123' }} quantity="250" />);
+  fireEvent.click(screen.getByText('दुकान से कॉल और कोटेशन चाहिए?'));
+  fireEvent.change(screen.getByLabelText('आपका नाम'), { target: { value: 'Test customer' } });
+  fireEvent.change(screen.getByLabelText('मोबाइल नंबर'), { target: { value: '9876543210' } });
+  const form = screen.getByRole('button').closest('form');
+  fireEvent.submit(form);
+  await screen.findByRole('alert');
+  const first = axios.post.mock.calls[0][1];
+  expect(first).toMatchObject({ cardId: 'card123', quantity: 250, customerName: 'Test customer' });
+  fireEvent.submit(form);
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('सेव हो गई'));
+  expect(axios.post.mock.calls[1][1].idempotencyKey).toBe(first.idempotencyKey);
+});
