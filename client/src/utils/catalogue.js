@@ -43,11 +43,11 @@ export function waitForCatalogueStartup() {
 }
 
 // Fetch explicit public/admin projections. The old full-record route is retired.
-export async function loadCards({ admin = false, token } = {}) {
+export async function loadCards({ admin = false, token, status } = {}) {
   const items = [];
   let page = 1;
   while (page <= 100) {
-    const data = !admin && page === 1 && startupPage ? await startupPage : (await axios.get(apiUrl(`${admin ? '/admin/cards' : '/cards'}?page=${page}&limit=100`), {
+    const data = !admin && page === 1 && startupPage ? await startupPage : (await axios.get(apiUrl(`${admin ? '/admin/cards' : '/cards'}?page=${page}&limit=100${admin && status ? `&status=${encodeURIComponent(status)}` : ''}`), {
       timeout: 15000,
       ...(admin ? { headers: { Authorization: token } } : {})
     })).data;

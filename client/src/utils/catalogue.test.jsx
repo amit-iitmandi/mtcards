@@ -35,3 +35,10 @@ test('the first catalogue load shares the startup request and waits through a Re
     vi.unstubAllEnvs();
   }
 });
+
+test('archived cards use an explicit authenticated status filter', async () => {
+  axios.get.mockResolvedValue({ data: { items: [{ _id: 'old', status: 'archived' }], total: 1 } });
+  expect(await loadCards({ admin: true, token: 'Bearer fixture', status: 'archived' })).toHaveLength(1);
+  expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('&status=archived'),
+    { timeout: 15000, headers: { Authorization: 'Bearer fixture' } });
+});
